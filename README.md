@@ -45,7 +45,7 @@
 <div class="container">
     <header>落とし物クラウド検索</header>
     
-    <!-- 管理者と一般ユーザーを切り替えるタブ（開発・テスト用） -->
+    <!-- 管理者と一般ユーザーを切り替えるタブ -->
     <div class="tabs">
         <div class="tab active" onclick="switchTab('user')">探す（ユーザー画面）</div>
         <div class="tab" onclick="switchTab('admin')">登録（管理者画面）</div>
@@ -112,10 +112,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // ==========================================
-    // ⚙️ 設定箇所：あなた自身のものに書き換えてください
-    // ==========================================
-    const MY_LIFF_ID = "2010743561-xEkvHtMf"; // あなたのLIFF ID
+    // LIFF ID と Firebase接続キー（設定済み）
+    const MY_LIFF_ID = "2010743561-xEkvHtMf";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAt0pdCitCLAApHouD5XBA47ubtUekTjMA",
@@ -125,7 +123,6 @@
         messagingSenderId: "626224212883",
         appId: "1:626224212883:web:310b83089938d498edd666"
     };
-    // ==========================================
 
     // Firebaseの初期化
     const app = initializeApp(firebaseConfig);
@@ -146,7 +143,6 @@
             }
         } catch (error) {
             console.error("LIFF初期化エラー:", error);
-            // 開発テスト用にログインなしでも動くようにロードだけする
             loadItems();
         }
     }
@@ -221,7 +217,6 @@
 
         let imageUrl = "";
         if (fileInput.files.length > 0) {
-            // 画像を圧縮してBase64テキストに変換する
             imageUrl = await compressImage(fileInput.files[0]);
         }
 
@@ -258,7 +253,7 @@
                 img.src = event.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400; // 400pxに縮小して容量を抑える
+                    const MAX_WIDTH = 400;
                     const MAX_HEIGHT = 400;
                     let width = img.width;
                     let height = img.height;
@@ -278,7 +273,6 @@
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    // JPEG形式、品質60%に圧縮してBase64化
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                     resolve(dataUrl);
                 };
@@ -311,7 +305,6 @@
         btn.disabled = true;
 
         try {
-            // 申請データをFirestoreに保存
             await addDoc(collection(db, "claims"), {
                 itemId: selectedItemId,
                 userId: userProfile ? userProfile.userId : "test-user-id",
