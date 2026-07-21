@@ -20,6 +20,10 @@
         .claim-user { font-weight: bold; color: #5bc0de; }
         .claim-detail { background: #222; padding: 10px; border-radius: 5px; font-size: 13px; margin: 10px 0; white-space: pre-wrap; }
         .approve-btn { background-color: #06C755; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; }
+        
+        /* 登録済みアイテム一覧用 */
+        .admin-item-card { background: #444; border: 1px solid #555; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .delete-btn { background: #888; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; width: auto; }
     </style>
 </head>
 <body>
@@ -72,15 +76,20 @@
         <button type="submit" id="submit-btn">落とし物を登録する</button>
     </form>
 
+    <!-- 📦 登録済みアイテム一覧 -->
+    <h3 class="section-title">📦 登録済みの落とし物</h3>
+    <div id="admin-items-list">読み込み中...</div>
+
     <h3 class="section-title">📩 届いた申請一覧</h3>
     <div id="claims-list">読み込み中...</div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    // deleteDocを追加
+    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔒【設定】スタッフ共通のパスワード
+    // 🔒 パスワード
     const ADMIN_PASSWORD = "1234";
 
     const firebaseConfig = {
@@ -114,6 +123,7 @@
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("admin-content").style.display = "block";
         loadClaims();
+        loadAdminItems(); // 登録済みアイテムも読み込む
     }
 
     window.logout = function() {
@@ -121,7 +131,54 @@
         location.reload();
     }
 
-    // 届いた申請一覧の読み込み
+    // 📦 登録済みの落とし物一覧を読み込む機能
+    async function loadAdminItems() {
+        const listDiv = document.getElementById("admin-items-list");
+        try {
+            const q = query(collection(db, "items"), orderBy("createdAt", "desc"));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                listDiv.innerHTML = "<p style='color:#ccc; font-size:14px;'>まだ登録された落とし物はありません。</p>";
+                return;
+            }
+
+            let html = "";
+            querySnapshot.forEach((doc) => {
+                const item = doc.data();
+                html += `
+                    <div class="admin-item-card">
+                        <div style="display:flex; align-items:center;">
+                            <img src="${item.imageUrl || ''}" style="width:50px; height:50px; object-fit:cover; border-radius:5px; margin-right:10px; background:#eee;">
+                            <div>
+                                <p style="margin:0; font-weight:bold; font-size:14px;">[${item.category}] ${item.publicDesc}</p>
+                                <p style="margin:0; font-size:12px; color:#f0ad4e;">🔒隠す特徴: ${item.secretDesc}</p>
+                            </div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteItem('${doc.id}')">削除</button>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        } catch (error) {
+            console.error(error);
+            listDiv.innerHTML = "<p style='color:red;'>読み込みに失敗しました。</p>";
+        }
+    }
+
+    // 落とし物データの削除機能
+    window.deleteItem = async function(id) {
+        if (!confirm("本当にこの落とし物データを削除しますか？")) return;
+        try {
+            await deleteDoc(doc(db, "items", id));
+            alert("削除しました。");
+            loadAdminItems(); // 一覧を再読み込み
+        } catch (error) {
+            alert("削除に失敗しました。");
+        }
+    }
+
+    // 📩 届いた申請一覧の読み込み
     async function loadClaims() {
         const claimsDiv = document.getElementById("claims-list");
         try {
@@ -129,7 +186,7 @@
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
-                claimsDiv.innerHTML = "<p style='color:#ccc;'>現在、新しい申請はありません。</p>";
+                claimsDiv.innerHTML = "<p style='color:#ccc; font-size:14px;'>現在、新しい申請はありません。</p>";
                 return;
             }
 
@@ -156,7 +213,7 @@
                         <p style="margin:5px 0;font-size:12px;color:#f0ad4e;">登録された隠す特徴: ${secretDesc}</p>
                         <div class="claim-detail">💬 ユーザーの回答:\n${claim.claimDetails}</div>
                         ${isProcessed 
-                            ? "<p style='color:#5cb85c;font-weight:bold;margin:0;'>✅ LINE通知送信済み</p>" 
+                            ? "<p style='color:#5cb85c;font-weight:bold;margin:0;'>✅ 承認済み</p>" 
                             : `<button class="approve-btn" onclick="approveClaim('${claimDoc.id}', '${claim.userId}', '${itemDesc}')">LINEで一致を通知する</button>`
                         }
                     </div>
@@ -212,6 +269,7 @@
             });
             alert("落とし物を登録しました！");
             document.getElementById("register-form").reset();
+            loadAdminItems(); // 登録直後に一覧を再読み込み
         } catch (error) {
             alert("登録失敗: " + error.message);
         } finally {
