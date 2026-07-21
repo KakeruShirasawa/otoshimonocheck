@@ -11,7 +11,6 @@
         header { background-color: #06C755; color: white; text-align: center; padding: 15px; font-weight: bold; font-size: 18px; }
         .content { padding: 20px; flex: 1; }
         
-        /* 検索エリアのデザイン */
         .search-box { background: #eef9f2; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c8edc9; }
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555; }
@@ -39,7 +38,6 @@
 <div class="container">
     <header>落とし物クラウド検索</header>
     <div class="content">
-        <!-- 検索入力フォーム -->
         <div class="search-box">
             <div class="form-group">
                 <label>カテゴリを選択</label>
@@ -79,7 +77,8 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, where, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    // whereを外し、orderByのみを使用するように変更
+    import { getFirestore, collection, getDocs, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const MY_LIFF_ID = "2010743561-xEkvHtMf";
     const firebaseConfig = {
@@ -111,7 +110,7 @@
     }
     initLiff();
 
-    // 検索処理
+    // 検索処理（インデックスエラーを回避するためJavaScript側で絞り込み）
     window.searchItems = async function() {
         const listDiv = document.getElementById("items-list");
         const category = document.getElementById("search-category").value;
@@ -120,14 +119,9 @@
         listDiv.innerHTML = "<p style='text-align:center;'>検索中...</p>";
 
         try {
-            let q;
-            if (category) {
-                q = query(collection(db, "items"), where("category", "==", category), orderBy("createdAt", "desc"));
-            } else {
-                q = query(collection(db, "items"), orderBy("createdAt", "desc"));
-            }
-
+            const q = query(collection(db, "items"), orderBy("createdAt", "desc"));
             const querySnapshot = await getDocs(q);
+
             if (querySnapshot.empty) {
                 listDiv.innerHTML = "<p style='text-align:center;color:gray;'>該当する落とし物は見つかりませんでした。</p>";
                 return;
@@ -138,6 +132,10 @@
 
             querySnapshot.forEach((doc) => {
                 const item = doc.data();
+                
+                // カテゴリ絞り込み
+                if (category && item.category !== category) return;
+                
                 // キーワード絞り込み
                 if (keyword && !item.publicDesc.toLowerCase().includes(keyword) && !item.location.toLowerCase().includes(keyword)) {
                     return;
