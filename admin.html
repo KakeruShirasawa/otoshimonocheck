@@ -1,229 +1,489 @@
-/* ==========================================================================
- * 別記様式第18号「施設占有者拾得物件届出書」印刷機能（A4 1枚 100%フィット版）
- * --------------------------------------------------------------------------
- * 使い方：
- *   admin.html 内の <script type="module"> ... </script> の中にある
- *   既存の  window.generatePoliceReport = function() { ... }  を
- *   まるごと削除し、この関数に差し替えてください。
- *   （fetchedItems / fac-police 等のID構成はそのまま利用しています）
- *
- * 縮小されなくなった理由：
- *   ・@page の余白と body 幅を mm で一致させ（A4 210mm − 余白10mm×2 ＝ 190mm）、
- *     table の width も 100% ではなく 190mm 固定にして、
- *     「印刷可能領域より広い要素」が一切存在しない状態にした。
- *   ・行高・フォントを mm / pt 指定にして、ブラウザの自動フィット縮小を無効化。
- *   ・11件以上選択された場合は自動で2ページ目以降に分割（1ページ10件）。
- * ========================================================================== */
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>落とし物管理（スタッフ専用）</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #222; margin: 0; padding: 0; color: #fff; }
+        .container { max-width: 650px; margin: 0 auto; background: #333; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+        header { background-color: #d9534f; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px; margin-bottom: 15px; }
+        
+        .admin-tabs { display: flex; background: #444; border-radius: 5px; overflow: hidden; margin-bottom: 20px; }
+        .admin-tab { flex: 1; text-align: center; padding: 10px 5px; cursor: pointer; font-size: 13px; font-weight: bold; color: #ccc; }
+        .admin-tab.active { background: #d9534f; color: white; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
-window.generatePoliceReport = function () {
-    const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
-    if (checkedBoxes.length === 0) {
-        alert("届出書に記載する落とし物にチェックを入れてください。");
-        return;
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input[type="text"], input[type="password"], input[type="number"], select, textarea { width: 100%; padding: 10px; border: 1px solid #555; background: #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #d9534f; color: white; border: none; width: 100%; padding: 12px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        #admin-content { display: none; }
+        .logout-btn { background: #555; font-size: 12px; padding: 5px 10px; width: auto; margin-bottom: 15px; }
+        
+        .claim-card { background: #444; border: 1px solid #666; border-radius: 5px; padding: 15px; margin-bottom: 15px; }
+        .claim-user { font-weight: bold; color: #5bc0de; }
+        .claim-detail { background: #222; padding: 10px; border-radius: 5px; font-size: 13px; margin: 10px 0; white-space: pre-wrap; }
+        .approve-btn { background-color: #06C755; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; }
+        
+        .admin-item-card { background: #444; border: 1px solid #555; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-left: 5px; }
+        .status-保管中 { background: #f0ad4e; color: #000; }
+        .status-警察届出済み { background: #0275d8; color: #fff; }
+        
+        .action-btns { display: flex; gap: 5px; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 3px; border: none; cursor: pointer; width: auto; margin-top:0; }
+        .status-btn { background: #0275d8; color: white; }
+        .delete-btn { background: #888; color: white; }
+        .print-btn { background: #06C755; color: white; font-weight: bold; margin-bottom: 15px; }
+
+        .facility-info-box { background: #222; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #555; }
+        .facility-info-box h4 { margin-top:0; color:#f0ad4e; font-size:14px; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="container">
+    <header>🛡️ スタッフ専用ログイン</header>
+    <form id="login-form">
+        <div class="form-group">
+            <label>管理者用パスワード</label>
+            <input type="password" id="login-pass" placeholder="パスワードを入力してください" required>
+        </div>
+        <button type="submit">ログイン</button>
+    </form>
+</div>
+
+<div id="admin-content" class="container">
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+    <header>🛡️ 落とし物管理システム</header>
+    
+    <div class="admin-tabs">
+        <div class="admin-tab active" onclick="switchAdminTab('register')">📝 新規登録</div>
+        <div class="admin-tab" onclick="switchAdminTab('items')">📦 登録済み一覧・警察届</div>
+        <div class="admin-tab" onclick="switchAdminTab('claims')">📩 届いた申請</div>
+    </div>
+
+    <!-- タブ1：新規登録 -->
+    <div id="tab-register" class="tab-content active">
+        <form id="register-form">
+            <div class="form-group">
+                <label>カテゴリ</label>
+                <select id="reg-category" required>
+                    <option value="財布">財布</option>
+                    <option value="鍵">鍵・キーホルダー</option>
+                    <option value="スマホ">スマートフォン・ガジェット</option>
+                    <option value="衣類">衣類・傘・バッグ</option>
+                    <option value="その他">その他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>公開する特徴（例：黒い二つ折り財布）</label>
+                <input type="text" id="reg-public-desc" required>
+            </div>
+            <div class="form-group">
+                <label>拾得場所</label>
+                <input type="text" id="reg-location" required>
+            </div>
+            <div class="form-group" style="background: #2a4030; padding: 10px; border-radius: 5px;">
+                <label>💵 現金が含まれる場合は金額を入力（任意）</label>
+                <input type="number" id="reg-cash-amount" placeholder="例：5000（数字のみ）">
+            </div>
+            <div class="form-group" style="background: #5c4815; padding: 10px; border-radius: 5px;">
+                <label>🔒 隠す特徴（ブランド名、中身の詳細など）</label>
+                <textarea id="reg-secret-desc" required rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>写真</label>
+                <input type="file" id="reg-file" accept="image/*" required>
+            </div>
+            <button type="submit" id="submit-btn">落とし物を登録する</button>
+        </form>
+    </div>
+
+    <!-- タブ2：登録済み一覧 ＆ 警察届出作成 -->
+    <div id="tab-items" class="tab-content">
+        <div class="facility-info-box">
+            <h4>📄 警察提出用 施設・提出先設定</h4>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <input type="text" id="fac-police" placeholder="提出先警察署名（例：麹町、築地 など）" style="font-size:12px;">
+                <input type="text" id="fac-company" placeholder="会社名/イベント名" style="font-size:12px;">
+                <input type="text" id="fac-address" placeholder="住所" style="font-size:12px;">
+                <input type="text" id="fac-tel" placeholder="電話番号" style="font-size:12px;">
+            </div>
+            <button type="button" class="btn-sm" style="background:#555; color:#fff; margin-top:8px;" onclick="saveFacilityInfo()">設定を変更保存</button>
+        </div>
+
+        <button class="print-btn" onclick="generatePoliceReport()">📄 チェックした物品で「別記様式第18号」を作成・印刷</button>
+
+        <div id="admin-items-list">読み込み中...</div>
+    </div>
+
+    <!-- タブ3：届いた申請 -->
+    <div id="tab-claims" class="tab-content">
+        <div id="claims-list">読み込み中...</div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const ADMIN_PASSWORD = "1234";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAt0pdCitCLAApHouD5XBA47ubtUekTjMA",
+        authDomain: "otoshimonocheck.firebaseapp.com",
+        projectId: "otoshimonocheck",
+        storageBucket: "otoshimonocheck.firebasestorage.app",
+        messagingSenderId: "626224212883",
+        appId: "1:626224212883:web:310b83089938d498edd666"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let fetchedItems = [];
+
+    if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
+        showAdmin();
     }
 
-    const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
-    const selectedItems = fetchedItems.filter(item => selectedIds.includes(item.id));
+    document.getElementById("login-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (document.getElementById("login-pass").value === ADMIN_PASSWORD) {
+            sessionStorage.setItem("isAdminLoggedIn", "true");
+            showAdmin();
+        } else {
+            alert("パスワードが違います。");
+        }
+    });
 
-    const now = new Date();
-    const yearStr = now.getFullYear();
-    const monthStr = now.getMonth() + 1;
-    const dayStr = now.getDate();
-
-    const policeInput = document.getElementById("fac-police").value.trim();
-    const policeStation = policeInput ? policeInput : "　　　　";
-    const companyName = document.getElementById("fac-company").value || "株式会社ビー・エフ・シー";
-    const address = document.getElementById("fac-address").value || "東京都中央区築地3-7-5 築地AIビル6階";
-    const tel = document.getElementById("fac-tel").value || "03-3524-0778";
-
-    const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
-        c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-    const ROWS_PER_PAGE = 10;   // A4 1枚あたりの明細件数（1件＝2行）
-    const pages = [];
-    for (let i = 0; i < selectedItems.length; i += ROWS_PER_PAGE) {
-        pages.push(selectedItems.slice(i, i + ROWS_PER_PAGE));
+    function showAdmin() {
+        document.getElementById("login-screen").style.display = "none";
+        document.getElementById("admin-content").style.display = "block";
+        loadFacilityInfo();
+        loadAdminItems();
+        loadClaims();
     }
 
-    // ---------- 1ページ分のHTMLを生成 ----------
-    function buildPage(items, pageIndex) {
-        let totalCash = 0;
-        let cashOnlyCount = 0;      // 現金のみ
-        let cashAndItemCount = 0;   // 現金及び物品
-        let itemOnlyCount = 0;      // 物品のみ
+    window.switchAdminTab = function(tabName) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        if (tabName === 'register') {
+            document.querySelectorAll('.admin-tab')[0].classList.add('active');
+            document.getElementById('tab-register').classList.add('active');
+        } else if (tabName === 'items') {
+            document.querySelectorAll('.admin-tab')[1].classList.add('active');
+            document.getElementById('tab-items').classList.add('active');
+            loadAdminItems();
+        } else if (tabName === 'claims') {
+            document.querySelectorAll('.admin-tab')[2].classList.add('active');
+            document.getElementById('tab-claims').classList.add('active');
+            loadClaims();
+        }
+    }
 
-        let rowsHtml = "";
+    window.logout = function() {
+        sessionStorage.removeItem("isAdminLoggedIn");
+        location.reload();
+    }
 
-        for (let i = 0; i < ROWS_PER_PAGE; i++) {
-            const branchNo = pageIndex * ROWS_PER_PAGE + i + 1;
+    window.saveFacilityInfo = function() {
+        localStorage.setItem("fac_police", document.getElementById("fac-police").value);
+        localStorage.setItem("fac-company", document.getElementById("fac-company").value);
+        localStorage.setItem("fac-address", document.getElementById("fac-address").value);
+        localStorage.setItem("fac-tel", document.getElementById("fac-tel").value);
+        alert("施設設定を保存しました。");
+    }
 
-            if (i < items.length) {
-                const item = items[i];
-                const dateVal = item.createdAt && item.createdAt.toDate
-                    ? new Date(item.createdAt.toDate()).toLocaleDateString('ja-JP')
-                    : "";
-                const cashVal = item.cashAmount ? Number(item.cashAmount) : 0;
+    function loadFacilityInfo() {
+        document.getElementById("fac-police").value = localStorage.getItem("fac_police") || "";
+        document.getElementById("fac-company").value = localStorage.getItem("fac-company") || "株式会社ビー・エフ・シー";
+        document.getElementById("fac-address").value = localStorage.getItem("fac-address") || "東京都中央区築地3-7-5 築地AIビル6階";
+        document.getElementById("fac-tel").value = localStorage.getItem("fac-tel") || "03-3524-0778";
+    }
 
-                const hasGoods = !!(item.publicDesc && String(item.publicDesc).trim());
-                if (cashVal > 0 && hasGoods) { cashAndItemCount++; }
-                else if (cashVal > 0) { cashOnlyCount++; }
-                else { itemOnlyCount++; }
-                totalCash += cashVal;
+    async function loadAdminItems() {
+        const listDiv = document.getElementById("admin-items-list");
+        try {
+            const q = query(collection(db, "items"), orderBy("createdAt", "desc"));
+            const querySnapshot = await getDocs(q);
 
-                rowsHtml += `
-                <tr class="detail-row">
-                    <td rowspan="2" class="center bunch">${branchNo}</td>
-                    <td class="right">${cashVal > 0 ? cashVal.toLocaleString() : ""}</td>
-                    <td class="left">${esc(item.category)}</td>
-                    <td class="left">${esc(item.publicDesc)}</td>
-                    <td class="center">1件</td>
-                    <td class="center small">${dateVal}</td>
-                    <td class="left small">${esc(item.location)}</td>
-                </tr>
-                <tr class="detail-row">
-                    <td class="right small"></td>
-                    <td class="left small"></td>
-                    <td class="left small">${esc(item.secretDesc)}</td>
-                    <td class="center">1点</td>
-                    <td class="center small">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td>
-                    <td class="left small"></td>
-                </tr>`;
-            } else {
-                rowsHtml += `
-                <tr class="detail-row">
-                    <td rowspan="2" class="center bunch"></td>
-                    <td></td><td></td><td></td><td></td>
-                    <td class="center small"></td><td></td>
-                </tr>
-                <tr class="detail-row">
-                    <td></td><td></td><td></td><td></td>
-                    <td class="center small">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td><td></td>
-                </tr>`;
+            if (querySnapshot.empty) {
+                listDiv.innerHTML = "<p style='color:#ccc; font-size:14px;'>まだ登録された落とし物はありません。</p>";
+                return;
             }
+
+            fetchedItems = [];
+            let html = "";
+            querySnapshot.forEach((docSnap) => {
+                const item = docSnap.data();
+                item.id = docSnap.id;
+                const itemStatus = item.status || "保管中";
+                fetchedItems.push(item);
+
+                const cashText = item.cashAmount ? ` 💵現金:${Number(item.cashAmount).toLocaleString()}円` : "";
+
+                html += `
+                    <div class="admin-item-card">
+                        <div style="display:flex; align-items:center;">
+                            <input type="checkbox" class="item-select-chk" value="${item.id}" style="width:20px; height:20px; margin-right:10px;">
+                            <img src="${item.imageUrl || ''}" style="width:45px; height:45px; object-fit:cover; border-radius:5px; margin-right:10px; background:#eee;">
+                            <div>
+                                <p style="margin:0; font-weight:bold; font-size:13px;">
+                                    [${item.category}] ${item.publicDesc}
+                                    <span class="status-badge status-${itemStatus}">${itemStatus}</span>
+                                </p>
+                                <p style="margin:0; font-size:11px; color:#f0ad4e;">🔒隠す特徴: ${item.secretDesc}${cashText}</p>
+                                <p style="margin:0; font-size:11px; color:#aaa;">📍場所: ${item.location}</p>
+                            </div>
+                        </div>
+                        <div class="action-btns">
+                            <button class="btn-sm status-btn" onclick="togglePoliceStatus('${item.id}', '${itemStatus}')">
+                                ${itemStatus === '警察届出済み' ? '保管中に戻す' : '警察届出済にする'}
+                            </button>
+                            <button class="btn-sm delete-btn" onclick="deleteItem('${item.id}')">削除</button>
+                        </div>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        } catch (error) {
+            console.error(error);
+            listDiv.innerHTML = "<p style='color:red;'>読み込みに失敗しました。</p>";
+        }
+    }
+
+    window.togglePoliceStatus = async function(id, currentStatus) {
+        const nextStatus = (currentStatus === "警察届出済み") ? "保管中" : "警察届出済み";
+        try {
+            await updateDoc(doc(db, "items", id), { status: nextStatus });
+            loadAdminItems();
+        } catch (error) {
+            alert("ステータス更新に失敗しました。");
+        }
+    }
+
+    window.deleteItem = async function(id) {
+        if (!confirm("本当にこの落とし物データを削除しますか？")) return;
+        try {
+            await deleteDoc(doc(db, "items", id));
+            alert("削除しました。");
+            loadAdminItems();
+        } catch (error) {
+            alert("削除に失敗しました。");
+        }
+    }
+
+    // 📄 別記様式第18号（Claude Code 修正版：A4 100%フィット・実寸固定出力）
+    window.generatePoliceReport = function () {
+        const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
+        if (checkedBoxes.length === 0) {
+            alert("届出書に記載する落とし物にチェックを入れてください。");
+            return;
         }
 
-        const totalCount = items.length;
-        const pageBreak = (pageIndex < pages.length - 1) ? ' page-break' : '';
-        const pageNote = pages.length > 1
-            ? `<div class="page-no">（${pageIndex + 1} / ${pages.length} 枚）</div>` : "";
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
+        const selectedItems = fetchedItems.filter(item => selectedIds.includes(item.id));
 
-        return `
-        <div class="sheet${pageBreak}">
-            <div class="top-header">
-                <div>別記様式第１８号</div>
-                <div>${yearStr} 年 　 ${monthStr} 月 　 ${dayStr} 日 届出</div>
-            </div>
+        const now = new Date();
+        const yearStr = now.getFullYear();
+        const monthStr = now.getMonth() + 1;
+        const dayStr = now.getDate();
 
-            <div class="info-block">
-                <div class="to-police">警視庁　　${esc(policeStation)}　警察署長殿</div>
-                <div class="from-box">
-                    <div><span class="lbl">住　　所</span>${esc(address)}</div>
-                    <div><span class="lbl">会 社 名</span>${esc(companyName)}</div>
-                    <div><span class="lbl">電　　話</span>${esc(tel)}</div>
+        const policeInput = document.getElementById("fac-police").value.trim();
+        const policeStation = policeInput ? policeInput : "    ";
+        const companyName = document.getElementById("fac-company").value || "株式会社ビー・エフ・シー";
+        const address = document.getElementById("fac-address").value || "東京都中央区築地3-7-5 築地AIビル6階";
+        const tel = document.getElementById("fac-tel").value || "03-3524-0778";
+
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+            c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+        const ROWS_PER_PAGE = 10;
+        const pages = [];
+        for (let i = 0; i < selectedItems.length; i += ROWS_PER_PAGE) {
+            pages.push(selectedItems.slice(i, i + ROWS_PER_PAGE));
+        }
+
+        function buildPage(items, pageIndex) {
+            let totalCash = 0;
+            let cashOnlyCount = 0;
+            let cashAndItemCount = 0;
+            let itemOnlyCount = 0;
+
+            let rowsHtml = "";
+
+            for (let i = 0; i < ROWS_PER_PAGE; i++) {
+                const branchNo = pageIndex * ROWS_PER_PAGE + i + 1;
+
+                if (i < items.length) {
+                    const item = items[i];
+                    const dateVal = item.createdAt && item.createdAt.toDate
+                        ? new Date(item.createdAt.toDate()).toLocaleDateString('ja-JP')
+                        : "";
+                    const cashVal = item.cashAmount ? Number(item.cashAmount) : 0;
+
+                    const hasGoods = !!(item.publicDesc && String(item.publicDesc).trim());
+                    if (cashVal > 0 && hasGoods) { cashAndItemCount++; }
+                    else if (cashVal > 0) { cashOnlyCount++; }
+                    else { itemOnlyCount++; }
+                    totalCash += cashVal;
+
+                    rowsHtml += `
+                    <tr class="detail-row">
+                        <td rowspan="2" class="center bunch">${branchNo}</td>
+                        <td class="right">${cashVal > 0 ? cashVal.toLocaleString() : ""}</td>
+                        <td class="left">${esc(item.category)}</td>
+                        <td class="left">${esc(item.publicDesc)}</td>
+                        <td class="center">1件</td>
+                        <td class="center small">${dateVal}</td>
+                        <td class="left small">${esc(item.location)}</td>
+                    </tr>
+                    <tr class="detail-row">
+                        <td class="right small"></td>
+                        <td class="left small"></td>
+                        <td class="left small">${esc(item.secretDesc)}</td>
+                        <td class="center">1点</td>
+                        <td class="center small">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td>
+                        <td class="left small"></td>
+                    </tr>`;
+                } else {
+                    rowsHtml += `
+                    <tr class="detail-row">
+                        <td rowspan="2" class="center bunch"></td>
+                        <td></td><td></td><td></td><td></td>
+                        <td class="center small"></td><td></td>
+                    </tr>
+                    <tr class="detail-row">
+                        <td></td><td></td><td></td><td></td>
+                        <td class="center small">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td><td></td>
+                    </tr>`;
+                }
+            }
+
+            const totalCount = items.length;
+            const pageBreak = (pageIndex < pages.length - 1) ? ' page-break' : '';
+            const pageNote = pages.length > 1
+                ? `<div class="page-no">（${pageIndex + 1} / ${pages.length} 枚）</div>` : "";
+
+            return `
+            <div class="sheet${pageBreak}">
+                <div class="top-header">
+                    <div>別記様式第１８号</div>
+                    <div>${yearStr} 年   ${monthStr} 月   ${dayStr} 日 届出</div>
                 </div>
-            </div>
 
-            <div class="title">施設占有者拾得物件届出書</div>
+                <div class="info-block">
+                    <div class="to-police">警視庁  ${esc(policeStation)} 警察署長殿</div>
+                    <div class="from-box">
+                        <div><span class="lbl">住  所</span>${esc(address)}</div>
+                        <div><span class="lbl">会 社 名</span>${esc(companyName)}</div>
+                        <div><span class="lbl">電  話</span>${esc(tel)}</div>
+                    </div>
+                </div>
 
-            <!-- 上部枠：受理番号／権利／氏名等告知同意 -->
-            <table class="head-table">
-                <colgroup>
-                    <col style="width:22mm"><col style="width:48mm">
-                    <col style="width:10mm"><col style="width:62mm">
-                    <col style="width:22mm"><col style="width:26mm">
-                </colgroup>
-                <tr>
-                    <td rowspan="2" class="center"><span class="v-text">受理番号</span></td>
-                    <td rowspan="2"></td>
-                    <td rowspan="2" class="center"><span class="v-text">権利</span></td>
-                    <td class="left nowrap">１．有権（　費用　・　報労金　・　所有権　）</td>
-                    <td rowspan="2" class="center"><span class="v-text">氏名等告知同意</span></td>
-                    <td class="center">１．有</td>
-                </tr>
-                <tr>
-                    <td class="left">２．失棄権</td>
-                    <td class="center">２．無</td>
-                </tr>
-            </table>
+                <div class="title">施設占有者拾得物件届出書</div>
 
-            <!-- 明細表 -->
-            <table class="main-table">
-                <colgroup>
-                    <col style="width:10mm"><col style="width:26mm">
-                    <col style="width:26mm"><col style="width:62mm">
-                    <col style="width:14mm"><col style="width:24mm">
-                    <col style="width:28mm">
-                </colgroup>
-                <thead>
-                    <tr class="th-row">
-                        <td rowspan="2" class="center">枝番</td>
-                        <td class="center">現金総額</td>
-                        <td colspan="2" class="center">物　　　　品</td>
-                        <td class="center">件数</td>
-                        <td class="center">拾得日時</td>
-                        <td class="center">拾得場所</td>
+                <table class="head-table">
+                    <colgroup>
+                        <col style="width:22mm"><col style="width:48mm">
+                        <col style="width:10mm"><col style="width:62mm">
+                        <col style="width:22mm"><col style="width:26mm">
+                    </colgroup>
+                    <tr>
+                        <td rowspan="2" class="center"><span class="v-text">受理番号</span></td>
+                        <td rowspan="2"></td>
+                        <td rowspan="2" class="center"><span class="v-text">権利</span></td>
+                        <td class="left nowrap">１．有権（ 費用 ・ 報労金 ・ 所有権 ）</td>
+                        <td rowspan="2" class="center"><span class="v-text">氏名等告知同意</span></td>
+                        <td class="center">１．有</td>
                     </tr>
-                    <tr class="th-row">
-                        <td class="center">現金内訳・記念貨</td>
-                        <td class="center">名　称</td>
-                        <td class="center">形状・種類・色・特徴等</td>
-                        <td class="center">点数</td>
-                        <td class="center">交付日時</td>
-                        <td class="center">明細番号</td>
+                    <tr>
+                        <td class="left">２．失棄権</td>
+                        <td class="center">２．無</td>
                     </tr>
-                </thead>
-                <tbody>${rowsHtml}</tbody>
-            </table>
+                </table>
 
-            <!-- 下部集計 -->
-            <table class="summary-table">
-                <colgroup>
-                    <col style="width:10mm"><col style="width:34mm">
-                    <col style="width:30mm"><col style="width:40mm">
-                    <col style="width:24mm"><col style="width:10mm">
-                    <col style="width:42mm">
-                </colgroup>
-                <tr class="sum-row">
-                    <td rowspan="3" class="center"><span class="v-text">種別</span></td>
-                    <td class="center">現 金 の み</td>
-                    <td class="right">${cashOnlyCount > 0 ? cashOnlyCount : ""} 件</td>
-                    <td class="right">円</td>
-                    <td class="right">点</td>
-                    <td rowspan="3" class="center"><span class="v-text">合計</span></td>
-                    <td class="right">${totalCount} 件</td>
-                </tr>
-                <tr class="sum-row">
-                    <td class="center">現金及び物品</td>
-                    <td class="right">${cashAndItemCount > 0 ? cashAndItemCount : ""} 件</td>
-                    <td class="right">${totalCash > 0 ? totalCash.toLocaleString() : ""} 円</td>
-                    <td class="right">${cashAndItemCount > 0 ? cashAndItemCount : ""} 点</td>
-                    <td class="right">${totalCash > 0 ? totalCash.toLocaleString() : ""} 円</td>
-                </tr>
-                <tr class="sum-row">
-                    <td class="center">物 品 の み</td>
-                    <td class="right">${itemOnlyCount > 0 ? itemOnlyCount : ""} 件</td>
-                    <td></td>
-                    <td class="right">${itemOnlyCount > 0 ? itemOnlyCount : ""} 点</td>
-                    <td class="right">${totalCount} 点</td>
-                </tr>
-                <tr>
-                    <td class="center"><span class="v-text">備考</span></td>
-                    <td colspan="6" class="remark"></td>
-                </tr>
-            </table>
-            ${pageNote}
-        </div>`;
-    }
+                <table class="main-table">
+                    <colgroup>
+                        <col style="width:10mm"><col style="width:26mm">
+                        <col style="width:26mm"><col style="width:62mm">
+                        <col style="width:14mm"><col style="width:24mm">
+                        <col style="width:28mm">
+                    </colgroup>
+                    <thead>
+                        <tr class="th-row">
+                            <td rowspan="2" class="center">枝番</td>
+                            <td class="center">現金総額</td>
+                            <td colspan="2" class="center">物    品</td>
+                            <td class="center">件数</td>
+                            <td class="center">拾得日時</td>
+                            <td class="center">拾得場所</td>
+                        </tr>
+                        <tr class="th-row">
+                            <td class="center">現金内訳・記念貨</td>
+                            <td class="center">名 称</td>
+                            <td class="center">形状・種類・色・特徴等</td>
+                            <td class="center">点数</td>
+                            <td class="center">交付日時</td>
+                            <td class="center">明細番号</td>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
 
-    const bodyHtml = pages.map((items, idx) => buildPage(items, idx)).join("");
+                <table class="summary-table">
+                    <colgroup>
+                        <col style="width:10mm"><col style="width:34mm">
+                        <col style="width:30mm"><col style="width:40mm">
+                        <col style="width:24mm"><col style="width:10mm">
+                        <col style="width:42mm">
+                    </colgroup>
+                    <tr class="sum-row">
+                        <td rowspan="3" class="center"><span class="v-text">種別</span></td>
+                        <td class="center">現 金 の み</td>
+                        <td class="right">${cashOnlyCount > 0 ? cashOnlyCount : ""} 件</td>
+                        <td class="right">円</td>
+                        <td class="right">点</td>
+                        <td rowspan="3" class="center"><span class="v-text">合計</span></td>
+                        <td class="right">${totalCount} 件</td>
+                    </tr>
+                    <tr class="sum-row">
+                        <td class="center">現金及び物品</td>
+                        <td class="right">${cashAndItemCount > 0 ? cashAndItemCount : ""} 件</td>
+                        <td class="right">${totalCash > 0 ? totalCash.toLocaleString() : ""} 円</td>
+                        <td class="right">${cashAndItemCount > 0 ? cashAndItemCount : ""} 点</td>
+                        <td class="right">${totalCash > 0 ? totalCash.toLocaleString() : ""} 円</td>
+                    </tr>
+                    <tr class="sum-row">
+                        <td class="center">物 品 の み</td>
+                        <td class="right">${itemOnlyCount > 0 ? itemOnlyCount : ""} 件</td>
+                        <td></td>
+                        <td class="right">${itemOnlyCount > 0 ? itemOnlyCount : ""} 点</td>
+                        <td class="right">${totalCount} 点</td>
+                    </tr>
+                    <tr>
+                        <td class="center"><span class="v-text">備考</span></td>
+                        <td colspan="6" class="remark"></td>
+                    </tr>
+                </table>
+                ${pageNote}
+            </div>`;
+        }
 
-    const html = `<!DOCTYPE html>
+        const bodyHtml = pages.map((items, idx) => buildPage(items, idx)).join("");
+
+        const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <title>別記様式第18号 施設占有者拾得物件届出書</title>
 <style>
-    /* ---- A4縦・余白10mm → 印字可能幅 190mm に完全一致させる ---- */
     @page { size: A4 portrait; margin: 10mm; }
 
     * { box-sizing: border-box; }
@@ -275,7 +535,6 @@ window.generatePoliceReport = function () {
         margin: 2mm 0 3mm 0;
     }
 
-    /* ---- 表は 100% ではなく mm 実寸で固定（縮小防止の要） ---- */
     table {
         width: 190mm;
         table-layout: fixed;
@@ -333,20 +592,161 @@ ${bodyHtml}
 </body>
 </html>`;
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-        alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
-        return;
-    }
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+            alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
+            return;
+        }
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
 
-    // レイアウト確定後に印刷ダイアログを開く（早すぎると縮小の原因になる）
-    printWindow.onload = function () {
-        setTimeout(function () {
-            printWindow.focus();
-            printWindow.print();
-        }, 300);
+        printWindow.onload = function () {
+            setTimeout(function () {
+                printWindow.focus();
+                printWindow.print();
+            }, 300);
+        };
     };
-};
+
+    async function loadClaims() {
+        const claimsDiv = document.getElementById("claims-list");
+        try {
+            const q = query(collection(db, "claims"), orderBy("createdAt", "desc"));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                claimsDiv.innerHTML = "<p style='color:#ccc; font-size:14px;'>現在、新しい申請はありません。</p>";
+                return;
+            }
+
+            let html = "";
+            for (const claimDoc of querySnapshot.docs) {
+                const claim = claimDoc.data();
+                
+                let itemDesc = "不明な落とし物";
+                let secretDesc = "なし";
+                if (claim.itemId) {
+                    const itemSnap = await getDoc(doc(db, "items", claim.itemId));
+                    if (itemSnap.exists()) {
+                        itemDesc = itemSnap.data().publicDesc;
+                        secretDesc = itemSnap.data().secretDesc;
+                    }
+                }
+
+                const isProcessed = claim.status === "承認済み";
+
+                html += `
+                    <div class="claim-card">
+                        <div class="claim-user">👤 申請者: ${claim.userName || '匿名'}</div>
+                        <p style="margin:5px 0;font-size:13px;color:#aaa;">対象: [${itemDesc}]</p>
+                        <p style="margin:5px 0;font-size:12px;color:#f0ad4e;">登録された隠す特徴: ${secretDesc}</p>
+                        <div class="claim-detail">💬 ユーザーの回答:\n${claim.claimDetails}</div>
+                        ${isProcessed 
+                            ? "<p style='color:#5cb85c;font-weight:bold;margin:0;'>✅ 承認済み（LINE通知送信完了）</p>" 
+                            : `<button class="approve-btn" onclick="approveClaim('${claimDoc.id}', '${claim.userId}', '${itemDesc}')">LINEで一致を通知する</button>`
+                        }
+                    </div>
+                `;
+            }
+            claimsDiv.innerHTML = html;
+        } catch (error) {
+            console.error(error);
+            claimsDiv.innerHTML = "<p style='color:red;'>申請データの読み込みに失敗しました。</p>";
+        }
+    }
+
+    window.approveClaim = async function(claimId, userId, itemDesc) {
+        if (!confirm(`「${itemDesc}」の持ち主として承認し、LINE通知を送りますか？`)) return;
+
+        const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzs24jJbacID3-AwwVV9Gwp-spxL2GRfxFah-fULu6LMBuFsBGLswYHfNJF6Ds3XMlo/exec";
+
+        try {
+            if (GAS_WEBAPP_URL) {
+                await fetch(GAS_WEBAPP_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, itemDesc })
+                });
+            }
+
+            await updateDoc(doc(db, "claims", claimId), { status: "承認済み" });
+            alert("承認しました！ユーザーのLINE宛に自動通知を送信しました。");
+            loadClaims();
+        } catch (error) {
+            console.error(error);
+            alert("更新処理に失敗しました。");
+        }
+    }
+
+    document.getElementById("register-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById("submit-btn");
+        submitBtn.innerText = "登録中...";
+        submitBtn.disabled = true;
+
+        const category = document.getElementById("reg-category").value;
+        const publicDesc = document.getElementById("reg-public-desc").value;
+        const location = document.getElementById("reg-location").value;
+        const cashAmount = document.getElementById("reg-cash-amount").value || 0;
+        const secretDesc = document.getElementById("reg-secret-desc").value;
+        const fileInput = document.getElementById("reg-file");
+
+        let imageUrl = "";
+        if (fileInput.files.length > 0) {
+            imageUrl = await compressImage(fileInput.files[0]);
+        }
+
+        try {
+            await addDoc(collection(db, "items"), {
+                category,
+                publicDesc,
+                location,
+                cashAmount: Number(cashAmount),
+                secretDesc,
+                imageUrl,
+                status: "保管中",
+                createdAt: serverTimestamp()
+            });
+            alert("落とし物を登録しました！");
+            document.getElementById("register-form").reset();
+            switchAdminTab('items');
+        } catch (error) {
+            alert("登録失敗: " + error.message);
+        } finally {
+            submitBtn.innerText = "落とし物を登録する";
+            submitBtn.disabled = false;
+        }
+    });
+
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400;
+                    const MAX_HEIGHT = 400;
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                };
+            };
+        });
+    }
+</script>
+</body>
+</html>
