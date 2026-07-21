@@ -7,7 +7,16 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #222; margin: 0; padding: 0; color: #fff; }
         .container { max-width: 600px; margin: 0 auto; background: #333; min-height: 100vh; padding: 20px; box-sizing: border-box; }
-        header { background-color: #d9534f; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px; margin-bottom: 20px; }
+        header { background-color: #d9534f; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px; margin-bottom: 15px; }
+        
+        /* 管理画面用タブのデザイン */
+        .admin-tabs { display: flex; background: #444; border-radius: 5px; overflow: hidden; margin-bottom: 20px; }
+        .admin-tab { flex: 1; text-align: center; padding: 10px 5px; cursor: pointer; font-size: 13px; font-weight: bold; color: #ccc; }
+        .admin-tab.active { background: #d9534f; color: white; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
         input[type="text"], input[type="password"], select, textarea { width: 100%; padding: 10px; border: 1px solid #555; background: #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
@@ -15,13 +24,11 @@
         #admin-content { display: none; }
         .logout-btn { background: #555; font-size: 12px; padding: 5px 10px; width: auto; margin-bottom: 15px; }
         
-        .section-title { border-bottom: 2px solid #d9534f; padding-bottom: 5px; margin-top: 30px; }
         .claim-card { background: #444; border: 1px solid #666; border-radius: 5px; padding: 15px; margin-bottom: 15px; }
         .claim-user { font-weight: bold; color: #5bc0de; }
         .claim-detail { background: #222; padding: 10px; border-radius: 5px; font-size: 13px; margin: 10px 0; white-space: pre-wrap; }
         .approve-btn { background-color: #06C755; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; }
         
-        /* 登録済みアイテム一覧用 */
         .admin-item-card { background: #444; border: 1px solid #555; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .delete-btn { background: #888; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; width: auto; }
     </style>
@@ -45,51 +52,61 @@
     <button class="logout-btn" onclick="logout()">ログアウト</button>
     <header>🛡️ 落とし物管理システム</header>
     
-    <h3 class="section-title">新規落とし物登録</h3>
-    <form id="register-form">
-        <div class="form-group">
-            <label>カテゴリ</label>
-            <select id="reg-category" required>
-                <option value="財布">財布</option>
-                <option value="鍵">鍵・キーホルダー</option>
-                <option value="スマホ">スマートフォン・ガジェット</option>
-                <option value="衣類">衣類・傘・バッグ</option>
-                <option value="その他">その他</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>公開する特徴（例：黒い二つ折り財布）</label>
-            <input type="text" id="reg-public-desc" required>
-        </div>
-        <div class="form-group">
-            <label>拾得場所</label>
-            <input type="text" id="reg-location" required>
-        </div>
-        <div class="form-group" style="background: #5c4815; padding: 10px; border-radius: 5px;">
-            <label>🔒 隠す特徴（ブランド名、中身の金額など）</label>
-            <textarea id="reg-secret-desc" required rows="3"></textarea>
-        </div>
-        <div class="form-group">
-            <label>写真</label>
-            <input type="file" id="reg-file" accept="image/*" required>
-        </div>
-        <button type="submit" id="submit-btn">落とし物を登録する</button>
-    </form>
+    <!-- タブメニュー -->
+    <div class="admin-tabs">
+        <div class="admin-tab active" onclick="switchAdminTab('register')">📝 新規登録</div>
+        <div class="admin-tab" onclick="switchAdminTab('items')">📦 登録済み一覧</div>
+        <div class="admin-tab" onclick="switchAdminTab('claims')">📩 届いた申請</div>
+    </div>
 
-    <!-- 📦 登録済みアイテム一覧 -->
-    <h3 class="section-title">📦 登録済みの落とし物</h3>
-    <div id="admin-items-list">読み込み中...</div>
+    <!-- タブ1：新規登録 -->
+    <div id="tab-register" class="tab-content active">
+        <form id="register-form">
+            <div class="form-group">
+                <label>カテゴリ</label>
+                <select id="reg-category" required>
+                    <option value="財布">財布</option>
+                    <option value="鍵">鍵・キーホルダー</option>
+                    <option value="スマホ">スマートフォン・ガジェット</option>
+                    <option value="衣類">衣類・傘・バッグ</option>
+                    <option value="その他">その他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>公開する特徴（例：黒い二つ折り財布）</label>
+                <input type="text" id="reg-public-desc" required>
+            </div>
+            <div class="form-group">
+                <label>拾得場所</label>
+                <input type="text" id="reg-location" required>
+            </div>
+            <div class="form-group" style="background: #5c4815; padding: 10px; border-radius: 5px;">
+                <label>🔒 隠す特徴（ブランド名、中身の金額など）</label>
+                <textarea id="reg-secret-desc" required rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>写真</label>
+                <input type="file" id="reg-file" accept="image/*" required>
+            </div>
+            <button type="submit" id="submit-btn">落とし物を登録する</button>
+        </form>
+    </div>
 
-    <h3 class="section-title">📩 届いた申請一覧</h3>
-    <div id="claims-list">読み込み中...</div>
+    <!-- タブ2：登録済み一覧 -->
+    <div id="tab-items" class="tab-content">
+        <div id="admin-items-list">読み込み中...</div>
+    </div>
+
+    <!-- タブ3：届いた申請 -->
+    <div id="tab-claims" class="tab-content">
+        <div id="claims-list">読み込み中...</div>
+    </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    // deleteDocを追加
     import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔒 パスワード
     const ADMIN_PASSWORD = "1234";
 
     const firebaseConfig = {
@@ -122,8 +139,27 @@
     function showAdmin() {
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("admin-content").style.display = "block";
+        loadAdminItems();
         loadClaims();
-        loadAdminItems(); // 登録済みアイテムも読み込む
+    }
+
+    // タブ切り替え処理
+    window.switchAdminTab = function(tabName) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        if (tabName === 'register') {
+            document.querySelectorAll('.admin-tab')[0].classList.add('active');
+            document.getElementById('tab-register').classList.add('active');
+        } else if (tabName === 'items') {
+            document.querySelectorAll('.admin-tab')[1].classList.add('active');
+            document.getElementById('tab-items').classList.add('active');
+            loadAdminItems();
+        } else if (tabName === 'claims') {
+            document.querySelectorAll('.admin-tab')[2].classList.add('active');
+            document.getElementById('tab-claims').classList.add('active');
+            loadClaims();
+        }
     }
 
     window.logout = function() {
@@ -131,7 +167,6 @@
         location.reload();
     }
 
-    // 📦 登録済みの落とし物一覧を読み込む機能
     async function loadAdminItems() {
         const listDiv = document.getElementById("admin-items-list");
         try {
@@ -166,19 +201,17 @@
         }
     }
 
-    // 落とし物データの削除機能
     window.deleteItem = async function(id) {
         if (!confirm("本当にこの落とし物データを削除しますか？")) return;
         try {
             await deleteDoc(doc(db, "items", id));
             alert("削除しました。");
-            loadAdminItems(); // 一覧を再読み込み
+            loadAdminItems();
         } catch (error) {
             alert("削除に失敗しました。");
         }
     }
 
-    // 📩 届いた申請一覧の読み込み
     async function loadClaims() {
         const claimsDiv = document.getElementById("claims-list");
         try {
@@ -226,7 +259,6 @@
         }
     }
 
-    // 申請承認処理
     window.approveClaim = async function(claimId, userId, itemDesc) {
         if (!confirm(`「${itemDesc}」の持ち主として承認し、LINE通知を送りますか？`)) return;
 
@@ -239,7 +271,6 @@
         }
     }
 
-    // 登録処理
     document.getElementById("register-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const submitBtn = document.getElementById("submit-btn");
@@ -269,7 +300,7 @@
             });
             alert("落とし物を登録しました！");
             document.getElementById("register-form").reset();
-            loadAdminItems(); // 登録直後に一覧を再読み込み
+            switchAdminTab('items'); // 登録完了したら一覧タブに切り替える
         } catch (error) {
             alert("登録失敗: " + error.message);
         } finally {
