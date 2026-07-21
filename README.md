@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -111,7 +110,6 @@
     }
     initLiff();
 
-    // 🌟 全角英数字を半角に変換し、小文字に統一する関数（検索のブレを吸収）
     function normalizeText(text) {
         if (!text) return "";
         return text.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
@@ -140,57 +138,61 @@
                 return;
             }
 
-            let html = "";
-            let matchCount = 0;
-            
-            // 全角スペースを半角スペースに変換してから分割し、文字を正規化
+            let matchedItems = [];
             const searchWords = rawKeyword.replace(/ /g, ' ').split(/\s+/).filter(w => w.length > 0).map(w => normalizeText(w));
 
             querySnapshot.forEach((doc) => {
                 const item = doc.data();
                 
-                // ① カテゴリ絞り込み
+                // カテゴリが選ばれている場合は、カテゴリ違いを除外
                 if (category && item.category !== category) return;
                 
-                // ② 隠しキーワード（同義語）の追加
                 let tags = "";
                 if (item.category === "スマホ") tags = "スマートフォン アイフォン iphone 携帯 ケータイ android アンドロイド";
                 if (item.category === "財布") tags = "サイフ さいふ ウォレット 小銭入れ";
                 if (item.category === "鍵") tags = "キー キーホルダー カギ かぎ";
                 if (item.category === "衣類") tags = "服 洋服 傘 かさ カサ バッグ 鞄 かばん カバン バック";
 
-                // 検索対象のテキストを結合して正規化
                 const targetText = normalizeText((item.publicDesc || '') + ' ' + (item.location || '') + ' ' + (item.category || '') + ' ' + tags);
                 const targetNoSpace = targetText.replace(/\s+/g, '');
 
-                // ③ AND検索（入力されたすべての単語が含まれているか判定）
-                const isMatched = searchWords.every(word => {
+                // 🌟 スコア計算（一致した単語の数をカウント）
+                let score = 0;
+                searchWords.forEach(word => {
                     const cleanWord = word.replace(/\s+/g, '');
-                    return targetText.includes(word) || 
-                           targetNoSpace.includes(cleanWord) || 
-                           cleanWord.includes(targetNoSpace);
+                    if (targetText.includes(word) || targetNoSpace.includes(cleanWord) || cleanWord.includes(targetNoSpace)) {
+                        score++;
+                    }
                 });
 
-                if (!isMatched) return;
-
-                matchCount++;
-                html += `
-                    <div class="item-card">
-                        <div class="item-img-container"><img src="${item.imageUrl || 'https://via.placeholder.com/100?text=No+Image'}" class="item-img"></div>
-                        <div class="item-info">
-                            <div>
-                                <h4 class="item-title">[${item.category}] ${item.publicDesc}</h4>
-                                <p class="item-detail">📍 場所: ${item.location}</p>
-                            </div>
-                            <button class="claim-btn" onclick="openClaimModal('${doc.id}')">これ私の！</button>
-                        </div>
-                    </div>
-                `;
+                // 1つでも一致する単語があればリストに追加
+                if (score > 0) {
+                    matchedItems.push({ id: doc.id, item: item, score: score });
+                }
             });
 
-            if (matchCount === 0) {
+            // 🌟 スコア（関連度）が高い順に並び替え
+            matchedItems.sort((a, b) => b.score - a.score);
+
+            if (matchedItems.length === 0) {
                 listDiv.innerHTML = "<p style='text-align:center;color:gray;'>該当する落とし物は見つかりませんでした。<br><small>※キーワードを変えて再検索してみてください。</small></p>";
             } else {
+                let html = "";
+                matchedItems.forEach(data => {
+                    const item = data.item;
+                    html += `
+                        <div class="item-card">
+                            <div class="item-img-container"><img src="${item.imageUrl || 'https://via.placeholder.com/100?text=No+Image'}" class="item-img"></div>
+                            <div class="item-info">
+                                <div>
+                                    <h4 class="item-title">[${item.category}] ${item.publicDesc}</h4>
+                                    <p class="item-detail">📍 場所: ${item.location}</p>
+                                </div>
+                                <button class="claim-btn" onclick="openClaimModal('${data.id}')">これ私の！</button>
+                            </div>
+                        </div>
+                    `;
+                });
                 listDiv.innerHTML = html;
             }
         } catch (error) {
