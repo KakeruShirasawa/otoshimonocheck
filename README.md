@@ -111,13 +111,11 @@
     }
     initLiff();
 
-    // 検索処理（あいまい検索 ＆ 全件表示防止）
     window.searchItems = async function() {
         const listDiv = document.getElementById("items-list");
         const category = document.getElementById("search-category").value;
         const rawKeyword = document.getElementById("search-keyword").value.trim().toLowerCase();
 
-        // キーワード未入力チェック（セキュリティ対策）
         if (!rawKeyword) {
             alert("セキュリティ保護のため、キーワード（例：黒、iPhone、二つ折り など）を入力して検索してください。");
             return;
@@ -136,21 +134,16 @@
 
             let html = "";
             let matchCount = 0;
-
-            // 検索用のキーワード分解（スペース区切り対応）
             const searchWords = rawKeyword.split(/\s+/).filter(w => w.length > 0);
 
             querySnapshot.forEach((doc) => {
                 const item = doc.data();
                 
-                // ① カテゴリ絞り込み
                 if (category && item.category !== category) return;
                 
-                // ② あいまいキーワード判定
                 const targetText = ((item.publicDesc || '') + ' ' + (item.location || '') + ' ' + (item.category || '')).toLowerCase();
                 const targetNoSpace = targetText.replace(/\s+/g, '');
 
-                // 単語が含まれているか、または登録文字が含まれるか（iPhone13 ↔ iPhone の相互部分一致）
                 const isMatched = searchWords.some(word => {
                     const cleanWord = word.replace(/\s+/g, '');
                     return targetText.includes(word) || 
