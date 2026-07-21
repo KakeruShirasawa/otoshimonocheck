@@ -4,30 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>落とし物管理（スタッフ専用）</title>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #222; margin: 0; padding: 0; color: #fff; }
         .container { max-width: 600px; margin: 0 auto; background: #333; min-height: 100vh; padding: 20px; box-sizing: border-box; }
         header { background-color: #d9534f; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px; margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input[type="text"], select, textarea { width: 100%; padding: 10px; border: 1px solid #555; background: #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        input[type="text"], input[type="password"], select, textarea { width: 100%; padding: 10px; border: 1px solid #555; background: #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
         button { background-color: #d9534f; color: white; border: none; width: 100%; padding: 12px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
-        #lock-screen { display: block; text-align: center; padding-top: 100px; color: red; }
         #admin-content { display: none; }
+        .logout-btn { background: #555; font-size: 12px; padding: 5px 10px; width: auto; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-<!-- ロック画面（デフォルト） -->
-<div id="lock-screen">
-    <h2>🔒 認証中...</h2>
-    <p>管理者権限を確認しています。</p>
+<!-- 🔑 ログイン画面 -->
+<div id="login-screen" class="container">
+    <header>🛡️ スタッフ専用ログイン</header>
+    <form id="login-form">
+        <div class="form-group">
+            <label>管理者用パスワード</label>
+            <input type="password" id="login-pass" placeholder="パスワードを入力してください" required>
+        </div>
+        <button type="submit">ログイン</button>
+    </form>
 </div>
 
-<!-- 管理者用コンテンツ -->
+<!-- 🛡️ 管理者用メインコンテンツ -->
 <div id="admin-content" class="container">
-    <header>🛡️ 落とし物管理システム（スタッフ専用）</header>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+    <header>🛡️ 落とし物管理システム</header>
     
     <h3>新規落とし物登録</h3>
     <form id="register-form">
@@ -65,7 +71,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const MY_LIFF_ID = "2010743561-xEkvHtMf";
+    // 🔒【設定】スタッフ共通のパスワード（自由に変更してください）
+    const ADMIN_PASSWORD = "1234";
+
     const firebaseConfig = {
         apiKey: "AIzaSyAt0pdCitCLAApHouD5XBA47ubtUekTjMA",
         authDomain: "otoshimonocheck.firebaseapp.com",
@@ -75,33 +83,35 @@
         appId: "1:626224212883:web:310b83089938d498edd666"
     };
 
-    // 🔒【超重要】ここにアクセスを許可するスタッフのLINEユーザーID（Uから始まる文字列）を入れます
-    const ADMIN_USER_IDS = ["ここにあなたのLINEユーザーIDを書く"]; 
-
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    async function initLiff() {
-        try {
-            await liff.init({ liffId: MY_LIFF_ID });
-            if (liff.isLoggedIn()) {
-                const profile = await liff.getProfile();
-                
-                // LINE IDチェックによる画面ロック解除処理
-                if (ADMIN_USER_IDS.includes(profile.userId)) {
-                    document.getElementById("lock-screen").style.display = "none";
-                    document.getElementById("admin-content").style.display = "block";
-                } else {
-                    document.getElementById("lock-screen").innerHTML = "<h2>❌ アクセス拒否</h2><p>この画面は許可されたスタッフ専用です。</p>";
-                }
-            } else {
-                liff.login();
-            }
-        } catch (error) {
-            document.getElementById("lock-screen").innerHTML = "<h2>エラー</h2><p>LINE認証に失敗しました。</p>";
-        }
+    // ログイン状態の確認（ブラウザを閉じるまで記憶）
+    if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
+        showAdmin();
     }
-    initLiff();
+
+    // ログイン処理
+    document.getElementById("login-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const pass = document.getElementById("login-pass").value;
+        if (pass === ADMIN_PASSWORD) {
+            sessionStorage.setItem("isAdminLoggedIn", "true");
+            showAdmin();
+        } else {
+            alert("パスワードが違います。");
+        }
+    });
+
+    function showAdmin() {
+        document.getElementById("login-screen").style.display = "none";
+        document.getElementById("admin-content").style.display = "block";
+    }
+
+    window.logout = function() {
+        sessionStorage.removeItem("isAdminLoggedIn");
+        location.reload();
+    }
 
     // 登録処理
     document.getElementById("register-form").addEventListener("submit", async (e) => {
