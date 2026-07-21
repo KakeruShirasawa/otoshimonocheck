@@ -279,7 +279,7 @@
         }
     }
 
-    // 📄 別記様式第18号（A4 1ページ完全固定・集計対応版）
+    // 📄 別記様式第18号（全列ミリ単位固定・原本レイアウト完全固着）
     window.generatePoliceReport = function() {
         const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
         if (checkedBoxes.length === 0) {
@@ -295,7 +295,8 @@
         const monthStr = now.getMonth() + 1;
         const dayStr = now.getDate();
 
-        const policeStation = document.getElementById("fac-police").value ? `${document.getElementById("fac-police").value} ` : "〇〇 ";
+        const policeInput = document.getElementById("fac-police").value.trim();
+        const policeStation = policeInput ? `${policeInput} ` : "   ";
         const companyName = document.getElementById("fac-company").value || "株式会社ビー・エフ・シー";
         const address = document.getElementById("fac-address").value || "東京都中央区築地3-7-5 築地AIビル6階";
         const tel = document.getElementById("fac-tel").value || "03-3524-0778";
@@ -305,7 +306,7 @@
         let itemOnlyCount = 0;
 
         let rowsHtml = "";
-        const maxRows = 10; // A4 1ページにきれいに収める行数
+        const maxRows = 11; // A4用紙1枚に完全に固定収容する行数
 
         for (let i = 0; i < maxRows; i++) {
             if (i < selectedItems.length) {
@@ -328,10 +329,10 @@
                         <td class="center"></td>
                         <td class="center">${cashVal > 0 ? cashVal.toLocaleString() : ''}</td>
                         <td class="center">${item.category}</td>
-                        <td>${fullDesc}</td>
+                        <td class="left">${fullDesc}</td>
                         <td class="center">1件<br>1点</td>
                         <td class="center">${dateVal}<br>/ : </td>
-                        <td>${item.location}</td>
+                        <td class="left">${item.location}</td>
                     </tr>
                 `;
             } else {
@@ -359,7 +360,7 @@
                 <style>
                     @page {
                         size: A4 portrait;
-                        margin: 8mm 10mm;
+                        margin: 10mm;
                     }
                     * { box-sizing: border-box; }
                     body {
@@ -368,13 +369,6 @@
                         color: #000;
                         margin: 0;
                         padding: 0;
-                    }
-                    .page-container {
-                        width: 100%;
-                        max-height: 275mm;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
                     }
                     .top-header {
                         display: flex;
@@ -387,39 +381,50 @@
                         justify-content: space-between;
                         font-size: 11px;
                         line-height: 1.4;
-                        margin-bottom: 5px;
+                        margin-bottom: 8px;
                     }
                     .title {
                         text-align: center;
-                        font-size: 16px;
+                        font-size: 18px;
                         font-weight: bold;
-                        margin: 5px 0 10px 0;
+                        margin: 5px 0 12px 0;
                         letter-spacing: 2px;
                     }
-                    table.form-table {
-                        width: 100%;
-                        border-collapse: collapse;
+                    
+                    /* mm単位で全テーブル・全列幅をガチガチに固定 */
+                    table {
+                        width: 190mm !important;
+                        table-layout: fixed !important;
+                        border-collapse: collapse !important;
                         border: 1.5px solid #000;
                     }
-                    table.form-table th, table.form-table td {
+                    th, td {
                         border: 1px solid #000;
-                        padding: 3px 4px;
+                        padding: 2px 3px;
                         font-size: 10px;
-                        height: 24px;
+                        overflow: hidden;
+                        word-break: break-all;
                     }
                     .center { text-align: center; }
+                    .left { text-align: left; }
                     
-                    table.summary-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        border: 1.5px solid #000;
-                        border-top: none;
-                        margin-top: -1px;
+                    .v-text {
+                        writing-mode: vertical-rl;
+                        text-orientation: upright;
+                        margin: 0 auto;
+                        letter-spacing: 1px;
+                        font-size: 9px;
+                        line-height: 1.1;
                     }
-                    table.summary-table td, table.summary-table th {
-                        border: 1px solid #000;
-                        padding: 4px;
-                        font-size: 10px;
+
+                    /* 明細行の高さを均一化 */
+                    .main-table tr {
+                        height: 22px;
+                    }
+
+                    table.summary-table {
+                        border-top: none !important;
+                        margin-top: -1px;
                     }
                     @media print {
                         body { margin: 0; }
@@ -427,92 +432,127 @@
                 </style>
             </head>
             <body>
-                <div class="page-container">
+                <div class="top-header">
+                    <div>別記様式第１８号</div>
+                    <div>${yearStr} 年 &nbsp; ${monthStr} 月 &nbsp; ${dayStr} 日 届出</div>
+                </div>
+
+                <div class="info-block">
                     <div>
-                        <div class="top-header">
-                            <div>別記様式第１８号</div>
-                            <div>${yearStr} 年 &nbsp; ${monthStr} 月 &nbsp; ${dayStr} 日 届出</div>
-                        </div>
-
-                        <div class="info-block">
-                            <div>
-                                <span style="font-size:13px; font-weight:bold;">警視庁 &nbsp; ${policeStation}警察署長殿</span>
-                            </div>
-                            <div style="text-align:right;">
-                                <div>住 &nbsp; 所: ${address}</div>
-                                <div>会社名: ${companyName}</div>
-                                <div>電 &nbsp; 話: ${tel}</div>
-                            </div>
-                        </div>
-
-                        <div class="title">施設占有者拾得物件届出書</div>
-
-                        <table class="form-table">
-                            <tr>
-                                <td rowspan="2" class="center" style="width:6%;">受理<br>番号</td>
-                                <td colspan="6" style="height:12px;"></td>
-                                <td rowspan="2" class="center" style="width:5%;">権<br>利</td>
-                                <td style="font-size:9px;" colspan="2">1. 有権（ 費用 ・ 報労金 ・ 所有権 ）<br>2. 失棄権</td>
-                                <td rowspan="2" class="center" style="width:8%;">氏名等<br>告知同意</td>
-                                <td style="font-size:9px;">1. 有 &nbsp; 2. 無</td>
-                            </tr>
-                            <tr>
-                                <td colspan="6"></td>
-                                <td colspan="2"></td>
-                                <td></td>
-                            </tr>
-
-                            <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
-                                <td rowspan="2" style="width:5%;">枝番</td>
-                                <td style="width:14%;">現金総額</td>
-                                <td colspan="2">物 &nbsp; &nbsp; &nbsp; &nbsp; 品</td>
-                                <td style="width:8%;">件数</td>
-                                <td style="width:14%;">拾得日時</td>
-                                <td style="width:14%;">拾得場所</td>
-                            </tr>
-                            <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
-                                <td>現金内訳・記念貨</td>
-                                <td style="width:12%;">名 &nbsp; 称</td>
-                                <td style="width:32%;">形状・種類・色・特徴等</td>
-                                <td>点数</td>
-                                <td>交付日時</td>
-                                <td>明細番号</td>
-                            </tr>
-
-                            ${rowsHtml}
-                        </table>
-
-                        <table class="summary-table">
-                            <tr>
-                                <td rowspan="3" class="center" style="width:6%;">種<br>別</td>
-                                <td class="center" style="width:14%;">現金のみ</td>
-                                <td style="width:20%; text-align:right;">件</td>
-                                <td style="width:25%; text-align:right;">円</td>
-                                <td style="width:14%; text-align:right;">点</td>
-                                <td rowspan="3" class="center" style="width:5%;">合<br>計</td>
-                                <td style="width:16%; text-align:right;">${selectedItems.length} 件</td>
-                            </tr>
-                            <tr>
-                                <td class="center">現金及び物品</td>
-                                <td style="text-align:right;">${cashAndItemCount > 0 ? cashAndItemCount + ' 件' : '件'}</td>
-                                <td style="text-align:right;">${totalCash > 0 ? totalCash.toLocaleString() + ' 円' : '円'}</td>
-                                <td style="text-align:right;">${cashAndItemCount > 0 ? cashAndItemCount + ' 点' : '点'}</td>
-                                <td style="text-align:right;">${totalCash > 0 ? totalCash.toLocaleString() + ' 円' : '円'}</td>
-                            </tr>
-                            <tr>
-                                <td class="center">物品のみ</td>
-                                <td style="text-align:right;">${itemOnlyCount > 0 ? itemOnlyCount + ' 件' : '件'}</td>
-                                <td></td>
-                                <td style="text-align:right;">${itemOnlyCount > 0 ? itemOnlyCount + ' 点' : '点'}</td>
-                                <td style="text-align:right;">${selectedItems.length} 点</td>
-                            </tr>
-                            <tr>
-                                <td class="center">備<br>考</td>
-                                <td colspan="6" style="height:30px;"></td>
-                            </tr>
-                        </table>
+                        <span style="font-size:13px; font-weight:bold;">警視庁 &nbsp; ${policeStation}警察署長殿</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div>住 &nbsp; 所: ${address}</div>
+                        <div>会社名: ${companyName}</div>
+                        <div>電 &nbsp; 話: ${tel}</div>
                     </div>
                 </div>
+
+                <div class="title">施設占有者拾得物件届出書</div>
+
+                <!-- 上部枠（権利・告知同意など） -->
+                <table>
+                    <colgroup>
+                        <col style="width: 12mm;">
+                        <col style="width: 83mm;">
+                        <col style="width: 10mm;">
+                        <col style="width: 55mm;">
+                        <col style="width: 10mm;">
+                        <col style="width: 20mm;">
+                    </colgroup>
+                    <tr>
+                        <td rowspan="2" class="center"><span class="v-text">受理番号</span></td>
+                        <td rowspan="2"></td>
+                        <td rowspan="2" class="center"><span class="v-text">権利</span></td>
+                        <td style="font-size:9px; vertical-align:top; padding:2px;">
+                            1. 有権（ 費用 ・ 報労金 ・ 所有権 ）<br>
+                            2. 失棄権
+                        </td>
+                        <td rowspan="2" class="center"><span class="v-text">氏名等告知同意</span></td>
+                        <td style="font-size:9px; vertical-align:top; padding:2px;">
+                            1. 有<br>
+                            2. 無
+                        </td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+
+                <!-- メイン明細テーブル -->
+                <table class="main-table" style="border-top: none; margin-top: -1px;">
+                    <colgroup>
+                        <col style="width: 10mm;"> <!-- 枝番 -->
+                        <col style="width: 25mm;"> <!-- 現金内訳 -->
+                        <col style="width: 25mm;"> <!-- 名称 -->
+                        <col style="width: 65mm;"> <!-- 形状・種類・色・特徴等 -->
+                        <col style="width: 15mm;"> <!-- 件数・点数 -->
+                        <col style="width: 25mm;"> <!-- 拾得日時/交付日時 -->
+                        <col style="width: 25mm;"> <!-- 拾得場所/明細番号 -->
+                    </colgroup>
+                    <thead>
+                        <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
+                            <td rowspan="2">枝番</td>
+                            <td>現金総額</td>
+                            <td colspan="2">物 &nbsp; &nbsp; &nbsp; &nbsp; 品</td>
+                            <td>件数</td>
+                            <td>拾得日時</td>
+                            <td>拾得場所</td>
+                        </tr>
+                        <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
+                            <td>現金内訳・記念貨</td>
+                            <td>名 &nbsp; 称</td>
+                            <td>形状・種類・色・特徴等</td>
+                            <td>点数</td>
+                            <td>交付日時</td>
+                            <td>明細番号</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <!-- 下部集計表 -->
+                <table class="summary-table">
+                    <colgroup>
+                        <col style="width: 10mm;">
+                        <col style="width: 25mm;">
+                        <col style="width: 30mm;">
+                        <col style="width: 40mm;">
+                        <col style="width: 20mm;">
+                        <col style="width: 15mm;">
+                        <col style="width: 50mm;">
+                    </colgroup>
+                    <tr>
+                        <td rowspan="3" class="center"><span class="v-text">種別</span></td>
+                        <td class="center">現金のみ</td>
+                        <td style="text-align:right;">件</td>
+                        <td style="text-align:right;">円</td>
+                        <td style="text-align:right;">点</td>
+                        <td rowspan="3" class="center"><span class="v-text">合計</span></td>
+                        <td style="text-align:right;">${selectedItems.length} 件</td>
+                    </tr>
+                    <tr>
+                        <td class="center">現金及び物品</td>
+                        <td style="text-align:right;">${cashAndItemCount > 0 ? cashAndItemCount + ' 件' : '件'}</td>
+                        <td style="text-align:right;">${totalCash > 0 ? totalCash.toLocaleString() + ' 円' : '円'}</td>
+                        <td style="text-align:right;">${cashAndItemCount > 0 ? cashAndItemCount + ' 点' : '点'}</td>
+                        <td style="text-align:right;">${totalCash > 0 ? totalCash.toLocaleString() + ' 円' : '円'}</td>
+                    </tr>
+                    <tr>
+                        <td class="center">物品のみ</td>
+                        <td style="text-align:right;">${itemOnlyCount > 0 ? itemOnlyCount + ' 件' : '件'}</td>
+                        <td></td>
+                        <td style="text-align:right;">${itemOnlyCount > 0 ? itemOnlyCount + ' 点' : '点'}</td>
+                        <td style="text-align:right;">${selectedItems.length} 点</td>
+                    </tr>
+                    <tr>
+                        <td class="center"><span class="v-text">備考</span></td>
+                        <td colspan="6" style="height:30px;"></td>
+                    </tr>
+                </table>
 
                 <script>
                     window.onload = function() { window.print(); }
