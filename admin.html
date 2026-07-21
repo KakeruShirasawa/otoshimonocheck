@@ -279,7 +279,7 @@
         }
     }
 
-    // 📄 警視庁「別記様式第18号 施設占有者拾得物件届出書（style05.pdf / ex05.pdf 完全準拠版）」
+    // 📄 警視庁「別記様式第18号 施設占有者拾得物件届出書（style05.pdf マス目・罫線完全復元版）」
     window.generatePoliceReport = function () {
         const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
         if (checkedBoxes.length === 0) {
@@ -304,7 +304,7 @@
         const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
             c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-        const ROWS_PER_PAGE = 10; // 1ページあたり10件（二段構成で20行）
+        const ROWS_PER_PAGE = 10;
         const pages = [];
         for (let i = 0; i < selectedItems.length; i += ROWS_PER_PAGE) {
             pages.push(selectedItems.slice(i, i + ROWS_PER_PAGE));
@@ -334,36 +334,38 @@
                     else { itemOnlyCount++; }
                     totalCash += cashVal;
 
-                    const secretText = item.secretDesc ? `特徴: ${item.secretDesc}` : "";
+                    const cashStr = cashVal > 0 ? cashVal.toLocaleString() : "";
 
                     rowsHtml += `
                     <tr class="detail-row">
                         <td rowspan="2" class="center bunch-cell">${branchNo}</td>
-                        <td class="right">${cashVal > 0 ? cashVal.toLocaleString() : ""}</td>
+                        <td class="money-cell"><div class="grid-box"><div></div><div></div><div></div><div></div><div></div><div></div><span class="cash-val">${cashStr}</span></div></td>
                         <td class="center">${esc(item.category)}</td>
                         <td class="left">${esc(item.publicDesc)}</td>
-                        <td class="center">1 件</td>
+                        <td class="center">1件</td>
                         <td class="center font-sm">${dateVal}</td>
                         <td class="left font-sm">${esc(item.location)}</td>
                     </tr>
                     <tr class="detail-row">
-                        <td class="right font-sm"></td>
+                        <td class="money-cell"><div class="grid-box"><div></div><div></div><div></div><div></div><div></div><div></div></div></td>
                         <td class="center font-sm"></td>
-                        <td class="left font-sm">${esc(secretText)}</td>
-                        <td class="center">1 点</td>
-                        <td class="center font-sm">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;</td>
+                        <td class="left font-sm">${item.secretDesc ? '特徴:' + esc(item.secretDesc) : ''}</td>
+                        <td class="center">1点</td>
+                        <td class="center font-sm">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td>
                         <td class="left font-sm"></td>
                     </tr>`;
                 } else {
                     rowsHtml += `
                     <tr class="detail-row">
                         <td rowspan="2" class="center bunch-cell"></td>
-                        <td></td><td></td><td></td><td></td>
+                        <td class="money-cell"><div class="grid-box"><div></div><div></div><div></div><div></div><div></div><div></div></div></td>
+                        <td></td><td></td><td></td>
                         <td class="center font-sm"></td><td></td>
                     </tr>
                     <tr class="detail-row">
-                        <td></td><td></td><td></td><td></td>
-                        <td class="center font-sm">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;</td><td></td>
+                        <td class="money-cell"><div class="grid-box"><div></div><div></div><div></div><div></div><div></div><div></div></div></td>
+                        <td></td><td></td><td></td>
+                        <td class="center font-sm">&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;:</td><td></td>
                     </tr>`;
                 }
             }
@@ -383,10 +385,10 @@
                 <div class="info-block">
                     <div class="to-police">警視庁 &nbsp; ${policeStation ? esc(policeStation) + ' ' : '    '} 警察署長殿</div>
                     <div class="from-box">
-                        <table>
-                            <tr><td class="no-border lbl">住 所</td><td class="no-border">${esc(address)}</td></tr>
-                            <tr><td class="no-border lbl">会社名</td><td class="no-border">${esc(companyName)}</td></tr>
-                            <tr><td class="no-border lbl">電 話</td><td class="no-border">${esc(tel)}</td></tr>
+                        <table class="no-border-table">
+                            <tr><td class="lbl">住 所</td><td>${esc(address)}</td></tr>
+                            <tr><td class="lbl">会社名</td><td>${esc(companyName)}</td></tr>
+                            <tr><td class="lbl">電 話</td><td>${esc(tel)}</td></tr>
                         </table>
                     </div>
                 </div>
@@ -402,7 +404,7 @@
                     </colgroup>
                     <tr>
                         <td rowspan="2" class="center"><span class="v-text">受理番号</span></td>
-                        <td rowspan="2"></td>
+                        <td rowspan="2" style="padding:0;"><div class="grid-box" style="height:100%;"><div></div><div></div><div></div><div></div><div></div><div></div></div></td>
                         <td rowspan="2" class="center"><span class="v-text">権利</span></td>
                         <td class="left font-sm">１．有権（ 費用 ・ 報労金 ・ 所有権 ）</td>
                         <td rowspan="2" class="center"><span class="v-text">氏名等告知同意</span></td>
@@ -414,11 +416,11 @@
                     </tr>
                 </table>
 
-                <!-- 表2：物件明細（警視庁原本構造再現） -->
+                <!-- 表2：物件明細（原本のマス目・二段構え完全再現） -->
                 <table class="main-table">
                     <colgroup>
                         <col style="width:10mm"> <!-- 枝番 -->
-                        <col style="width:28mm"> <!-- 現金総額/現金内訳 -->
+                        <col style="width:28mm"> <!-- 現金総額/現金内訳 (マス目) -->
                         <col style="width:24mm"> <!-- 名称 -->
                         <col style="width:62mm"> <!-- 形状・種類・色・特徴等 -->
                         <col style="width:14mm"> <!-- 件数/点数 -->
@@ -497,7 +499,6 @@
 <meta charset="UTF-8">
 <title>別記様式第18号 施設占有者拾得物件届出書</title>
 <style>
-    /* 警視庁指定別記様式第18号 A4実寸（210mm x 297mm）精密再現CSS */
     @page { 
         size: A4 portrait; 
         margin: 0; 
@@ -541,9 +542,9 @@
         margin-bottom: 2mm;
     }
     .to-police { font-size: 12.5pt; font-weight: bold; }
-    .from-box { text-align: left; }
-    .from-box table { border: none !important; width: auto !important; }
-    .from-box td { border: none !important; padding: 1px 0 !important; font-size: 11pt !important; }
+    
+    .from-box table.no-border-table { border: none !important; width: auto !important; margin: 0; }
+    .from-box table.no-border-table td { border: none !important; padding: 1px 0 !important; font-size: 11pt !important; }
     .from-box .lbl { width: 18mm; display: inline-block; }
 
     .title {
@@ -571,12 +572,41 @@
         overflow: hidden;
         word-break: break-all;
     }
-    .no-border { border: none !important; }
     .center { text-align: center; }
     .left   { text-align: left; }
     .right  { text-align: right; }
     .font-sm { font-size: 9pt; }
     .bunch-cell { font-size: 10pt; font-weight: bold; }
+
+    /* 🌟 現金入力欄および受理番号のマス目（縦区切り線）の復元 */
+    .money-cell {
+        padding: 0 !important;
+        position: relative;
+    }
+    .grid-box {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        min-height: 20px;
+        position: relative;
+    }
+    .grid-box div {
+        flex: 1;
+        border-right: 0.5pt solid #000;
+    }
+    .grid-box div:last-child {
+        border-right: none;
+    }
+    .cash-val {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-weight: bold;
+        font-size: 10pt;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 0 2px;
+    }
 
     .v-text {
         writing-mode: vertical-rl;
@@ -671,7 +701,7 @@ ${bodyHtml}
             claimsDiv.innerHTML = html;
         } catch (error) {
             console.error(error);
-            claimsDiv.innerHTML = "<p style='color:red;'>申請データの読み込みに失敗しました。</p>";
+            listDiv.innerHTML = "<p style='color:red;'>申請データの読み込みに失敗しました。</p>";
         }
     }
 
