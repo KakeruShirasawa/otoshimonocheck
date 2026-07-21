@@ -6,7 +6,7 @@
     <title>落とし物管理（スタッフ専用）</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #222; margin: 0; padding: 0; color: #fff; }
-        .container { max-width: 600px; margin: 0 auto; background: #333; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+        .container { max-width: 650px; margin: 0 auto; background: #333; min-height: 100vh; padding: 20px; box-sizing: border-box; }
         header { background-color: #d9534f; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px; margin-bottom: 15px; }
         
         .admin-tabs { display: flex; background: #444; border-radius: 5px; overflow: hidden; margin-bottom: 20px; }
@@ -28,13 +28,23 @@
         .claim-detail { background: #222; padding: 10px; border-radius: 5px; font-size: 13px; margin: 10px 0; white-space: pre-wrap; }
         .approve-btn { background-color: #06C755; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; }
         
-        .admin-item-card { background: #444; border: 1px solid #555; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .delete-btn { background: #888; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; width: auto; }
+        .admin-item-card { background: #444; border: 1px solid #555; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-left: 5px; }
+        .status-保管中 { background: #f0ad4e; color: #000; }
+        .status-警察届出済み { background: #0275d8; color: #fff; }
+        
+        .action-btns { display: flex; gap: 5px; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 3px; border: none; cursor: pointer; width: auto; margin-top:0; }
+        .status-btn { background: #0275d8; color: white; }
+        .delete-btn { background: #888; color: white; }
+        .print-btn { background: #06C755; color: white; font-weight: bold; margin-bottom: 15px; }
+
+        .facility-info-box { background: #222; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #555; }
+        .facility-info-box h4 { margin-top:0; color:#f0ad4e; font-size:14px; }
     </style>
 </head>
 <body>
 
-<!-- 🔑 ログイン画面 -->
 <div id="login-screen" class="container">
     <header>🛡️ スタッフ専用ログイン</header>
     <form id="login-form">
@@ -46,15 +56,13 @@
     </form>
 </div>
 
-<!-- 🛡️ 管理者用メインコンテンツ -->
 <div id="admin-content" class="container">
     <button class="logout-btn" onclick="logout()">ログアウト</button>
     <header>🛡️ 落とし物管理システム</header>
     
-    <!-- タブメニュー -->
     <div class="admin-tabs">
         <div class="admin-tab active" onclick="switchAdminTab('register')">📝 新規登録</div>
-        <div class="admin-tab" onclick="switchAdminTab('items')">📦 登録済み一覧</div>
+        <div class="admin-tab" onclick="switchAdminTab('items')">📦 登録済み一覧・警察届</div>
         <div class="admin-tab" onclick="switchAdminTab('claims')">📩 届いた申請</div>
     </div>
 
@@ -91,8 +99,22 @@
         </form>
     </div>
 
-    <!-- タブ2：登録済み一覧 -->
+    <!-- タブ2：登録済み一覧 ＆ 警察届出作成 -->
     <div id="tab-items" class="tab-content">
+        <!-- 届出用の施設情報設定（全項目初期値セット済み） -->
+        <div class="facility-info-box">
+            <h4>📄 警察提出用 施設設定</h4>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <input type="text" id="fac-police" placeholder="警察署名（例：築地）" style="font-size:12px;">
+                <input type="text" id="fac-company" placeholder="会社名/イベント名" style="font-size:12px;">
+                <input type="text" id="fac-address" placeholder="住所" style="font-size:12px;">
+                <input type="text" id="fac-tel" placeholder="電話番号" style="font-size:12px;">
+            </div>
+            <button type="button" class="btn-sm" style="background:#555; color:#fff; margin-top:8px;" onclick="saveFacilityInfo()">設定を変更保存</button>
+        </div>
+
+        <button class="print-btn" onclick="generatePoliceReport()">📄 チェックした物品で「別記様式第18号」を作成・印刷</button>
+
         <div id="admin-items-list">読み込み中...</div>
     </div>
 
@@ -120,14 +142,15 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    let fetchedItems = [];
+
     if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
         showAdmin();
     }
 
     document.getElementById("login-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        const pass = document.getElementById("login-pass").value;
-        if (pass === ADMIN_PASSWORD) {
+        if (document.getElementById("login-pass").value === ADMIN_PASSWORD) {
             sessionStorage.setItem("isAdminLoggedIn", "true");
             showAdmin();
         } else {
@@ -138,6 +161,7 @@
     function showAdmin() {
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("admin-content").style.display = "block";
+        loadFacilityInfo();
         loadAdminItems();
         loadClaims();
     }
@@ -165,6 +189,21 @@
         location.reload();
     }
 
+    window.saveFacilityInfo = function() {
+        localStorage.setItem("fac_police", document.getElementById("fac-police").value);
+        localStorage.setItem("fac-company", document.getElementById("fac-company").value);
+        localStorage.setItem("fac-address", document.getElementById("fac-address").value);
+        localStorage.setItem("fac-tel", document.getElementById("fac-tel").value);
+        alert("施設情報を保存しました。");
+    }
+
+    function loadFacilityInfo() {
+        document.getElementById("fac-police").value = localStorage.getItem("fac_police") || "築地";
+        document.getElementById("fac-company").value = localStorage.getItem("fac-company") || "株式会社ビー・エフ・シー";
+        document.getElementById("fac-address").value = localStorage.getItem("fac-address") || "東京都中央区築地3-7-5 築地AIビル6階";
+        document.getElementById("fac-tel").value = localStorage.getItem("fac-tel") || "03-3524-0778";
+    }
+
     async function loadAdminItems() {
         const listDiv = document.getElementById("admin-items-list");
         try {
@@ -176,19 +215,34 @@
                 return;
             }
 
+            fetchedItems = [];
             let html = "";
-            querySnapshot.forEach((doc) => {
-                const item = doc.data();
+            querySnapshot.forEach((docSnap) => {
+                const item = docSnap.data();
+                item.id = docSnap.id;
+                const itemStatus = item.status || "保管中";
+                fetchedItems.push(item);
+
                 html += `
                     <div class="admin-item-card">
                         <div style="display:flex; align-items:center;">
-                            <img src="${item.imageUrl || ''}" style="width:50px; height:50px; object-fit:cover; border-radius:5px; margin-right:10px; background:#eee;">
+                            <input type="checkbox" class="item-select-chk" value="${item.id}" style="width:20px; height:20px; margin-right:10px;">
+                            <img src="${item.imageUrl || ''}" style="width:45px; height:45px; object-fit:cover; border-radius:5px; margin-right:10px; background:#eee;">
                             <div>
-                                <p style="margin:0; font-weight:bold; font-size:14px;">[${item.category}] ${item.publicDesc}</p>
-                                <p style="margin:0; font-size:12px; color:#f0ad4e;">🔒隠す特徴: ${item.secretDesc}</p>
+                                <p style="margin:0; font-weight:bold; font-size:13px;">
+                                    [${item.category}] ${item.publicDesc}
+                                    <span class="status-badge status-${itemStatus}">${itemStatus}</span>
+                                </p>
+                                <p style="margin:0; font-size:11px; color:#f0ad4e;">🔒隠す特徴: ${item.secretDesc}</p>
+                                <p style="margin:0; font-size:11px; color:#aaa;">📍場所: ${item.location}</p>
                             </div>
                         </div>
-                        <button class="delete-btn" onclick="deleteItem('${doc.id}')">削除</button>
+                        <div class="action-btns">
+                            <button class="btn-sm status-btn" onclick="togglePoliceStatus('${item.id}', '${itemStatus}')">
+                                ${itemStatus === '警察届出済み' ? '保管中に戻す' : '警察届出済にする'}
+                            </button>
+                            <button class="btn-sm delete-btn" onclick="deleteItem('${item.id}')">削除</button>
+                        </div>
                     </div>
                 `;
             });
@@ -196,6 +250,16 @@
         } catch (error) {
             console.error(error);
             listDiv.innerHTML = "<p style='color:red;'>読み込みに失敗しました。</p>";
+        }
+    }
+
+    window.togglePoliceStatus = async function(id, currentStatus) {
+        const nextStatus = (currentStatus === "警察届出済み") ? "保管中" : "警察届出済み";
+        try {
+            await updateDoc(doc(db, "items", id), { status: nextStatus });
+            loadAdminItems();
+        } catch (error) {
+            alert("ステータス更新に失敗しました。");
         }
     }
 
@@ -208,6 +272,123 @@
         } catch (error) {
             alert("削除に失敗しました。");
         }
+    }
+
+    window.generatePoliceReport = function() {
+        const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
+        if (checkedBoxes.length === 0) {
+            alert("届出書に記載する落とし物にチェックを入れてください。");
+            return;
+        }
+
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
+        const selectedItems = fetchedItems.filter(item => selectedIds.includes(item.id));
+
+        const now = new Date();
+        const dateStr = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日`;
+
+        const policeStation = document.getElementById("fac-police").value || "築地";
+        const companyName = document.getElementById("fac-company").value || "株式会社ビー・エフ・シー";
+        const address = document.getElementById("fac-address").value || "東京都中央区築地3-7-5 築地AIビル6階";
+        const tel = document.getElementById("fac-tel").value || "03-3524-0778";
+
+        let rowsHtml = "";
+        selectedItems.forEach((item) => {
+            const dateVal = item.createdAt ? new Date(item.createdAt.toDate()).toLocaleDateString('ja-JP') : "";
+            rowsHtml += `
+                <tr>
+                    <td>${item.category}</td>
+                    <td>${item.publicDesc} / 特徴:${item.secretDesc}</td>
+                    <td>1 件</td>
+                    <td>1 点</td>
+                    <td>${dateVal}</td>
+                    <td>${item.location}</td>
+                </tr>
+            `;
+        });
+
+        for (let i = selectedItems.length; i < 15; i++) {
+            rowsHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
+        }
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ja">
+            <head>
+                <meta charset="UTF-8">
+                <title>施設占有者拾得物件届出書（別記様式第18号）</title>
+                <style>
+                    body { font-family: "MS Mincho", "Hiragino Mincho ProN", serif; font-size: 12px; margin: 20px; }
+                    .title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 10px; letter-spacing: 2px; }
+                    .header-table { width: 100%; margin-bottom: 10px; border-collapse: collapse; }
+                    .header-table td { vertical-align: top; }
+                    .right-info { text-align: right; }
+                    table.main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+                    table.main-table th, table.main-table td { border: 1px solid #000; padding: 4px; text-align: center; font-size: 11px; }
+                    table.summary-table { width: 100%; border-collapse: collapse; }
+                    table.summary-table th, table.summary-table td { border: 1px solid #000; padding: 4px; text-align: center; font-size: 11px; }
+                    @media print {
+                        body { margin: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div style="text-align:right; font-size:10px;">別記様式第18号</div>
+                <div class="title">施設占有者拾得物件届出書</div>
+                
+                <table class="header-table">
+                    <tr>
+                        <td style="width: 50%;">
+                            <p>${dateStr} 届出</p>
+                            <p style="font-size:14px; font-weight:bold; margin-top:15px;">警視庁 ${policeStation} 警察署長 殿</p>
+                        </td>
+                        <td class="right-info" style="width: 50%;">
+                            <p>住所: ${address}</p>
+                            <p>会社名/氏名: ${companyName}</p>
+                            <p>電話: ${tel}</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <table class="main-table">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="width:15%;">名称</th>
+                            <th style="width:35%;">形状・種類・色・特徴等</th>
+                            <th style="width:10%;">件数</th>
+                            <th style="width:10%;">点数</th>
+                            <th style="width:15%;">拾得日時</th>
+                            <th style="width:15%;">拾得場所</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <table class="summary-table">
+                    <tr style="background:#eee;">
+                        <th rowspan="2">種別</th>
+                        <th>物品のみ</th>
+                        <td style="width:20%;">${selectedItems.length} 件</td>
+                        <td style="width:20%;">${selectedItems.length} 点</td>
+                    </tr>
+                    <tr>
+                        <th>合計</th>
+                        <td>${selectedItems.length} 件</td>
+                        <td>${selectedItems.length} 点</td>
+                    </tr>
+                </table>
+
+                <p style="font-size:10px; margin-top:10px;">※本紙はシステムより出力された届出用帳票です。印刷（またはPDF化）して警察署に提出してください。</p>
+                <script>
+                    window.onload = function() { window.print(); }
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     }
 
     async function loadClaims() {
@@ -257,7 +438,6 @@
         }
     }
 
-    // 申請承認処理（GAS連携完了版）
     window.approveClaim = async function(claimId, userId, itemDesc) {
         if (!confirm(`「${itemDesc}」の持ち主として承認し、LINE通知を送りますか？`)) return;
 
