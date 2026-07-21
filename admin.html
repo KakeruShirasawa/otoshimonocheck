@@ -279,7 +279,7 @@
         }
     }
 
-    // 📄 別記様式第18号（全列ミリ単位固定・原本レイアウト完全固着）
+    // 📄 別記様式第18号（A4用紙100%フィット・実寸サイズ大版）
     window.generatePoliceReport = function() {
         const checkedBoxes = document.querySelectorAll('.item-select-chk:checked');
         if (checkedBoxes.length === 0) {
@@ -306,7 +306,7 @@
         let itemOnlyCount = 0;
 
         let rowsHtml = "";
-        const maxRows = 11; // A4用紙1枚に完全に固定収容する行数
+        const maxRows = 10; // A4 1ページに収める行数
 
         for (let i = 0; i < maxRows; i++) {
             if (i < selectedItems.length) {
@@ -360,48 +360,49 @@
                 <style>
                     @page {
                         size: A4 portrait;
-                        margin: 10mm;
+                        margin: 12mm 12mm;
                     }
                     * { box-sizing: border-box; }
                     body {
                         font-family: "ヒラギノ明朝 ProN W3", "Hiragino Mincho ProN", "MS 明朝", serif;
-                        font-size: 11px;
+                        font-size: 13px;
                         color: #000;
                         margin: 0;
                         padding: 0;
+                        width: 100%;
                     }
                     .top-header {
                         display: flex;
                         justify-content: space-between;
-                        font-size: 11px;
-                        margin-bottom: 5px;
+                        font-size: 13px;
+                        margin-bottom: 8px;
                     }
                     .info-block {
                         display: flex;
                         justify-content: space-between;
-                        font-size: 11px;
-                        line-height: 1.4;
-                        margin-bottom: 8px;
+                        font-size: 13px;
+                        line-height: 1.5;
+                        margin-bottom: 12px;
                     }
                     .title {
                         text-align: center;
-                        font-size: 18px;
+                        font-size: 22px;
                         font-weight: bold;
-                        margin: 5px 0 12px 0;
-                        letter-spacing: 2px;
+                        margin: 10px 0 15px 0;
+                        letter-spacing: 3px;
                     }
                     
-                    /* mm単位で全テーブル・全列幅をガチガチに固定 */
+                    /* A4幅（100%）いっぱいにピッタリ配置 */
                     table {
-                        width: 190mm !important;
+                        width: 100% !important;
                         table-layout: fixed !important;
                         border-collapse: collapse !important;
                         border: 1.5px solid #000;
                     }
                     th, td {
                         border: 1px solid #000;
-                        padding: 2px 3px;
-                        font-size: 10px;
+                        padding: 4px 5px;
+                        font-size: 11px;
                         overflow: hidden;
                         word-break: break-all;
                     }
@@ -413,13 +414,13 @@
                         text-orientation: upright;
                         margin: 0 auto;
                         letter-spacing: 1px;
-                        font-size: 9px;
+                        font-size: 11px;
                         line-height: 1.1;
                     }
 
-                    /* 明細行の高さを均一化 */
+                    /* 明細行の高さを十分に確保 */
                     .main-table tr {
-                        height: 22px;
+                        height: 28px;
                     }
 
                     table.summary-table {
@@ -439,7 +440,7 @@
 
                 <div class="info-block">
                     <div>
-                        <span style="font-size:13px; font-weight:bold;">警視庁 &nbsp; ${policeStation}警察署長殿</span>
+                        <span style="font-size:15px; font-weight:bold;">警視庁 &nbsp; ${policeStation}警察署長殿</span>
                     </div>
                     <div style="text-align:right;">
                         <div>住 &nbsp; 所: ${address}</div>
@@ -453,23 +454,23 @@
                 <!-- 上部枠（権利・告知同意など） -->
                 <table>
                     <colgroup>
-                        <col style="width: 12mm;">
-                        <col style="width: 83mm;">
-                        <col style="width: 10mm;">
-                        <col style="width: 55mm;">
-                        <col style="width: 10mm;">
-                        <col style="width: 20mm;">
+                        <col style="width: 6%;">  <!-- 受理番号タイトル -->
+                        <col style="width: 40%;"> <!-- 受理番号入力欄 -->
+                        <col style="width: 5%;">  <!-- 権利タイトル -->
+                        <col style="width: 31%;"> <!-- 権利選択欄 -->
+                        <col style="width: 8%;">  <!-- 氏名等告知同意タイトル -->
+                        <col style="width: 10%;"> <!-- 有無欄 -->
                     </colgroup>
                     <tr>
                         <td rowspan="2" class="center"><span class="v-text">受理番号</span></td>
                         <td rowspan="2"></td>
                         <td rowspan="2" class="center"><span class="v-text">権利</span></td>
-                        <td style="font-size:9px; vertical-align:top; padding:2px;">
+                        <td style="font-size:10px; vertical-align:top; padding:4px;">
                             1. 有権（ 費用 ・ 報労金 ・ 所有権 ）<br>
                             2. 失棄権
                         </td>
                         <td rowspan="2" class="center"><span class="v-text">氏名等告知同意</span></td>
-                        <td style="font-size:9px; vertical-align:top; padding:2px;">
+                        <td style="font-size:10px; vertical-align:top; padding:4px;">
                             1. 有<br>
                             2. 無
                         </td>
@@ -483,16 +484,16 @@
                 <!-- メイン明細テーブル -->
                 <table class="main-table" style="border-top: none; margin-top: -1px;">
                     <colgroup>
-                        <col style="width: 10mm;"> <!-- 枝番 -->
-                        <col style="width: 25mm;"> <!-- 現金内訳 -->
-                        <col style="width: 25mm;"> <!-- 名称 -->
-                        <col style="width: 65mm;"> <!-- 形状・種類・色・特徴等 -->
-                        <col style="width: 15mm;"> <!-- 件数・点数 -->
-                        <col style="width: 25mm;"> <!-- 拾得日時/交付日時 -->
-                        <col style="width: 25mm;"> <!-- 拾得場所/明細番号 -->
+                        <col style="width: 5%;">  <!-- 枝番 -->
+                        <col style="width: 13%;"> <!-- 現金総額/内訳 -->
+                        <col style="width: 13%;"> <!-- 名称 -->
+                        <col style="width: 37%;"> <!-- 形状・種類・色・特徴等 -->
+                        <col style="width: 8%;">  <!-- 件数/点数 -->
+                        <col style="width: 12%;"> <!-- 拾得日時/交付日時 -->
+                        <col style="width: 12%;"> <!-- 拾得場所/明細番号 -->
                     </colgroup>
                     <thead>
-                        <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
+                        <tr class="center" style="font-size:10px; font-weight:bold; background:#fafafa;">
                             <td rowspan="2">枝番</td>
                             <td>現金総額</td>
                             <td colspan="2">物 &nbsp; &nbsp; &nbsp; &nbsp; 品</td>
@@ -500,7 +501,7 @@
                             <td>拾得日時</td>
                             <td>拾得場所</td>
                         </tr>
-                        <tr class="center" style="font-size:9px; font-weight:bold; background:#fafafa;">
+                        <tr class="center" style="font-size:10px; font-weight:bold; background:#fafafa;">
                             <td>現金内訳・記念貨</td>
                             <td>名 &nbsp; 称</td>
                             <td>形状・種類・色・特徴等</td>
@@ -517,13 +518,13 @@
                 <!-- 下部集計表 -->
                 <table class="summary-table">
                     <colgroup>
-                        <col style="width: 10mm;">
-                        <col style="width: 25mm;">
-                        <col style="width: 30mm;">
-                        <col style="width: 40mm;">
-                        <col style="width: 20mm;">
-                        <col style="width: 15mm;">
-                        <col style="width: 50mm;">
+                        <col style="width: 5%;">  <!-- 種別 -->
+                        <col style="width: 13%;"> <!-- 区分 -->
+                        <col style="width: 15%;"> <!-- 件数 -->
+                        <col style="width: 20%;"> <!-- 金額 -->
+                        <col style="width: 12%;"> <!-- 点数 -->
+                        <col style="width: 5%;">  <!-- 合計 -->
+                        <col style="width: 30%;"> <!-- 合計数値 -->
                     </colgroup>
                     <tr>
                         <td rowspan="3" class="center"><span class="v-text">種別</span></td>
@@ -550,7 +551,7 @@
                     </tr>
                     <tr>
                         <td class="center"><span class="v-text">備考</span></td>
-                        <td colspan="6" style="height:30px;"></td>
+                        <td colspan="6" style="height:35px;"></td>
                     </tr>
                 </table>
 
