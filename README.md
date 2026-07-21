@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -110,10 +111,18 @@
     }
     initLiff();
 
+    // 🌟 全角英数字を半角に変換し、小文字に統一する関数（検索のブレを吸収）
+    function normalizeText(text) {
+        if (!text) return "";
+        return text.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        }).toLowerCase();
+    }
+
     window.searchItems = async function() {
         const listDiv = document.getElementById("items-list");
         const category = document.getElementById("search-category").value;
-        const rawKeyword = document.getElementById("search-keyword").value.trim().toLowerCase();
+        const rawKeyword = document.getElementById("search-keyword").value.trim();
 
         if (!rawKeyword) {
             alert("セキュリティ保護のため、キーワード（例：黒、iPhone、二つ折り など）を入力して検索してください。");
@@ -133,17 +142,29 @@
 
             let html = "";
             let matchCount = 0;
-            const searchWords = rawKeyword.split(/\s+/).filter(w => w.length > 0);
+            
+            // 全角スペースを半角スペースに変換してから分割し、文字を正規化
+            const searchWords = rawKeyword.replace(/ /g, ' ').split(/\s+/).filter(w => w.length > 0).map(w => normalizeText(w));
 
             querySnapshot.forEach((doc) => {
                 const item = doc.data();
                 
+                // ① カテゴリ絞り込み
                 if (category && item.category !== category) return;
                 
-                const targetText = ((item.publicDesc || '') + ' ' + (item.location || '') + ' ' + (item.category || '')).toLowerCase();
+                // ② 隠しキーワード（同義語）の追加
+                let tags = "";
+                if (item.category === "スマホ") tags = "スマートフォン アイフォン iphone 携帯 ケータイ android アンドロイド";
+                if (item.category === "財布") tags = "サイフ さいふ ウォレット 小銭入れ";
+                if (item.category === "鍵") tags = "キー キーホルダー カギ かぎ";
+                if (item.category === "衣類") tags = "服 洋服 傘 かさ カサ バッグ 鞄 かばん カバン バック";
+
+                // 検索対象のテキストを結合して正規化
+                const targetText = normalizeText((item.publicDesc || '') + ' ' + (item.location || '') + ' ' + (item.category || '') + ' ' + tags);
                 const targetNoSpace = targetText.replace(/\s+/g, '');
 
-                const isMatched = searchWords.some(word => {
+                // ③ AND検索（入力されたすべての単語が含まれているか判定）
+                const isMatched = searchWords.every(word => {
                     const cleanWord = word.replace(/\s+/g, '');
                     return targetText.includes(word) || 
                            targetNoSpace.includes(cleanWord) || 
