@@ -16,6 +16,7 @@
         label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555; }
         select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
         .search-btn { background-color: #06C755; color: white; border: none; width: 100%; padding: 12px; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer; margin-top: 5px; }
+        .search-note { font-size: 11px; color: #666; margin-top: 5px; }
 
         .item-card { background: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; display: flex; }
         .item-img-container { width: 100px; height: 100px; background: #eee; flex-shrink: 0; }
@@ -40,7 +41,7 @@
     <div class="content">
         <div class="search-box">
             <div class="form-group">
-                <label>カテゴリを選択</label>
+                <label>① カテゴリを選択</label>
                 <select id="search-category">
                     <option value="">すべてのカテゴリ</option>
                     <option value="財布">財布</option>
@@ -51,15 +52,16 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>キーワード（例：黒、折りたたみ）</label>
-                <input type="text" id="search-keyword" placeholder="特徴を入力">
+                <label>② 特徴キーワード（必須）</label>
+                <input type="text" id="search-keyword" placeholder="例：黒、iPhone、二つ折り など">
+                <div class="search-note">※悪用防止のためキーワード入力が必要です。「iPhone13」でお探しの場合は「iPhone」など大まかな単語でも検索できます。</div>
             </div>
             <button class="search-btn" onclick="searchItems()">落とし物を検索する</button>
         </div>
 
         <h3>検索結果</h3>
         <div id="items-list">
-            <p style="text-align:center;color:gray;">条件を指定して「検索する」ボタンを押してください。</p>
+            <p style="text-align:center;color:gray;">キーワードを入力して「検索する」ボタンを押してください。</p>
         </div>
     </div>
     <div id="my-id-display" class="user-id-box">LINE ID読込中...</div>
@@ -77,7 +79,6 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    // whereを外し、orderByのみを使用するように変更
     import { getFirestore, collection, getDocs, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const MY_LIFF_ID = "2010743561-xEkvHtMf";
@@ -110,11 +111,17 @@
     }
     initLiff();
 
-    // 検索処理（インデックスエラーを回避するためJavaScript側で絞り込み）
+    // 検索処理（あいまい検索 ＆ 全件表示防止）
     window.searchItems = async function() {
         const listDiv = document.getElementById("items-list");
         const category = document.getElementById("search-category").value;
-        const keyword = document.getElementById("search-keyword").value.trim().toLowerCase();
+        const rawKeyword = document.getElementById("search-keyword").value.trim().toLowerCase();
+
+        // キーワード未入力チェック（セキュリティ対策）
+        if (!rawKeyword) {
+            alert("セキュリティ保護のため、キーワード（例：黒、iPhone、二つ折り など）を入力して検索してください。");
+            return;
+        }
 
         listDiv.innerHTML = "<p style='text-align:center;'>検索中...</p>";
 
@@ -130,16 +137,28 @@
             let html = "";
             let matchCount = 0;
 
+            // 検索用のキーワード分解（スペース区切り対応）
+            const searchWords = rawKeyword.split(/\s+/).filter(w => w.length > 0);
+
             querySnapshot.forEach((doc) => {
                 const item = doc.data();
                 
-                // カテゴリ絞り込み
+                // ① カテゴリ絞り込み
                 if (category && item.category !== category) return;
                 
-                // キーワード絞り込み
-                if (keyword && !item.publicDesc.toLowerCase().includes(keyword) && !item.location.toLowerCase().includes(keyword)) {
-                    return;
-                }
+                // ② あいまいキーワード判定
+                const targetText = ((item.publicDesc || '') + ' ' + (item.location || '') + ' ' + (item.category || '')).toLowerCase();
+                const targetNoSpace = targetText.replace(/\s+/g, '');
+
+                // 単語が含まれているか、または登録文字が含まれるか（iPhone13 ↔ iPhone の相互部分一致）
+                const isMatched = searchWords.some(word => {
+                    const cleanWord = word.replace(/\s+/g, '');
+                    return targetText.includes(word) || 
+                           targetNoSpace.includes(cleanWord) || 
+                           cleanWord.includes(targetNoSpace);
+                });
+
+                if (!isMatched) return;
 
                 matchCount++;
                 html += `
@@ -157,7 +176,7 @@
             });
 
             if (matchCount === 0) {
-                listDiv.innerHTML = "<p style='text-align:center;color:gray;'>該当する落とし物は見つかりませんでした。</p>";
+                listDiv.innerHTML = "<p style='text-align:center;color:gray;'>該当する落とし物は見つかりませんでした。<br><small>※キーワードを変えて再検索してみてください。</small></p>";
             } else {
                 listDiv.innerHTML = html;
             }
